@@ -1,9 +1,9 @@
-from langgraph_checkpoint_surreal.database import (
+from langgraph_surrealdb.database import (
     SurrealAsyncConnection,
     SurrealConnection,
 )
-from langgraph_checkpoint_surreal.database.common import select_result
-from langgraph_checkpoint_surreal.database.models.write import DbWrite, DbWriteId
+from langgraph_surrealdb.database.common import select_result
+from langgraph_surrealdb.database.models.write import DbWrite, DbWriteId
 
 SETUP_QUERY = """
 DEFINE TABLE IF NOT EXISTS writes SCHEMALESS;

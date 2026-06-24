@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from langgraph_checkpoint_surreal.database import surreal_client
-from langgraph_checkpoint_surreal.database.common import SurrealConnSettings
+from langgraph_surrealdb.database import surreal_client
+from langgraph_surrealdb.database.common import SurrealConnSettings
 
 
 def get_surreal_settings() -> SurrealConnSettings:

@@ -10,15 +10,15 @@ from langgraph.checkpoint.base import (
     empty_checkpoint,
 )
 
-from langgraph_checkpoint_surreal.checkpoint import SurrealSaver
-from langgraph_checkpoint_surreal.database.repository.checkpoints import _search_where
+from langgraph_surrealdb.checkpoint import SurrealSaver
+from langgraph_surrealdb.database.repository.checkpoints import _search_where
 
 
 def test_dump():
 
     from langgraph.checkpoint.base import CheckpointMetadata
 
-    from langgraph_checkpoint_surreal.database.models.checkpoint import (
+    from langgraph_surrealdb.database.models.checkpoint import (
         DbCheckpoint,
         DbCheckpointId,
     )

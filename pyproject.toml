@@ -1,7 +1,7 @@
 [project]
-name = "langgraph_checkpoint_surreal"
+name = "langgraph-surrealdb"
 version = "0.1.0"
-description = "SurrealDB implementation of LangGraph checkpoint, store, and cache."
+description = "SurrealDB as LangGraph storage layer."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -34,7 +34,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/langgraph_checkpoint_surreal"]
+packages = ["src/langgraph_surrealdb"]
 
 [tool.uv]
 default-groups = ['dev']

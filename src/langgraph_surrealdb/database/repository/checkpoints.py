@@ -1,12 +1,12 @@
 import re
 from typing import Any
 
-from langgraph_checkpoint_surreal.database import (
+from langgraph_surrealdb.database import (
     SurrealAsyncConnection,
     SurrealConnection,
 )
-from langgraph_checkpoint_surreal.database.common import select_result
-from langgraph_checkpoint_surreal.database.models.checkpoint import (
+from langgraph_surrealdb.database.common import select_result
+from langgraph_surrealdb.database.models.checkpoint import (
     DbCheckpoint,
     DbCheckpointId,
 )

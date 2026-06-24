@@ -1,10 +1,10 @@
 """Database helper exports under the package namespace."""
 
-from langgraph_checkpoint_surreal.database.common import (
+from langgraph_surrealdb.database.common import (
     async_surreal_client,
     surreal_client,
 )
-from langgraph_checkpoint_surreal.database.interface import (
+from langgraph_surrealdb.database.interface import (
     SurrealAsyncConnection,
     SurrealConnection,
 )

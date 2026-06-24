@@ -5,7 +5,7 @@ from langgraph.checkpoint.serde.base import SerializerProtocol
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import Self
 
-from langgraph_checkpoint_surreal.database.models import DbRecordId
+from langgraph_surrealdb.database.models import DbRecordId
 
 
 class DbWriteId(DbRecordId):

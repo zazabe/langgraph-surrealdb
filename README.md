@@ -5,7 +5,7 @@ SurrealDB-backed checkpointers for LangGraph.
 ## Install
 
 ```bash
-pip install langgraph_checkpoint_surreal
+pip install langgraph-surrealdb
 ```
 
 ## Configure SurrealDB
@@ -24,7 +24,7 @@ export SURREAL_TOKEN=""
 Or create the saver directly from settings:
 
 ```python
-from langgraph_checkpoint_surreal import AsyncSurrealSaver, SurrealSaver, SurrealConnSettings
+from langgraph_surrealdb import AsyncSurrealSaver, SurrealSaver, SurrealConnSettings
 
 settings = SurrealConnSettings(
     url="ws://localhost:8000/rpc",
@@ -46,7 +46,7 @@ async with AsyncSurrealSaver.from_settings(settings) as checkpointer:
 
 ```python
 from langgraph.graph import StateGraph
-from langgraph_checkpoint_surreal import SurrealSaver
+from langgraph_surrealdb import SurrealSaver
 
 # build your graph
 builder = StateGraph(dict)
@@ -64,7 +64,7 @@ with SurrealSaver.from_env() as checkpointer:
 
 ```python
 from langgraph.graph import StateGraph
-from langgraph_checkpoint_surreal import AsyncSurrealSaver
+from langgraph_surrealdb import AsyncSurrealSaver
 
 builder = StateGraph(dict)
 # ... add nodes and edges ...

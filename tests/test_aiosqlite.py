@@ -10,7 +10,7 @@ from langgraph.checkpoint.base import (
     empty_checkpoint,
 )
 
-from langgraph_checkpoint_surreal.checkpoint import AsyncSurrealSaver
+from langgraph_surrealdb.checkpoint import AsyncSurrealSaver
 
 
 class TestAsyncSurrealSaver:

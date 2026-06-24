@@ -18,20 +18,20 @@ from langgraph.checkpoint.base import (
 )
 from langgraph.checkpoint.serde.base import SerializerProtocol
 
-from langgraph_checkpoint_surreal.database.common import (
+from langgraph_surrealdb.database.common import (
     SurrealConnSettings,
     async_surreal_client,
 )
-from langgraph_checkpoint_surreal.database.interface import SurrealAsyncConnection
-from langgraph_checkpoint_surreal.database.models.checkpoint import (
+from langgraph_surrealdb.database.interface import SurrealAsyncConnection
+from langgraph_surrealdb.database.models.checkpoint import (
     DbCheckpoint,
     DbCheckpointId,
 )
-from langgraph_checkpoint_surreal.database.models.write import DbWrite
-from langgraph_checkpoint_surreal.database.repository.checkpoints import (
+from langgraph_surrealdb.database.models.write import DbWrite
+from langgraph_surrealdb.database.repository.checkpoints import (
     DbAsyncCheckpointsRepository,
 )
-from langgraph_checkpoint_surreal.database.repository.writes import (
+from langgraph_surrealdb.database.repository.writes import (
     DbAsyncWritesRepository,
 )
 

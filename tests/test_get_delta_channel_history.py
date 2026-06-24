@@ -30,7 +30,7 @@ from langgraph.checkpoint.serde.types import _DeltaSnapshot
 from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
-from langgraph_checkpoint_surreal.checkpoint import (
+from langgraph_surrealdb.checkpoint import (
     AsyncSurrealSaver,
     SurrealSaver,
 )

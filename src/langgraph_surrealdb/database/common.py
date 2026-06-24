@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from surrealdb import AsyncSurreal, Surreal
 from surrealdb.types import Value
 
-from langgraph_checkpoint_surreal.database.interface import (
+from langgraph_surrealdb.database.interface import (
     SurrealAsyncConnection,
     SurrealConnection,
 )

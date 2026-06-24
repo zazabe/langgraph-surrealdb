@@ -27,7 +27,7 @@ from langgraph.channels.delta import DeltaChannel
 from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
-from langgraph_checkpoint_surreal.checkpoint import AsyncSurrealSaver, SurrealSaver
+from langgraph_surrealdb.checkpoint import AsyncSurrealSaver, SurrealSaver
 
 # `langgraph` core isn't a dep of `langgraph-checkpoint-sqlite`. Skip the
 # whole module rather than importerror-ing in the standalone CI shape.
