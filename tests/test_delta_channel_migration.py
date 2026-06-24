@@ -1,4 +1,4 @@
-"""Sqlite-specific migration smoke tests: BinaryOperatorAggregate -> DeltaChannel.
+"""SurrealDB-specific migration smoke tests: BinaryOperatorAggregate -> DeltaChannel.
 
 Mirrors `libs/langgraph/tests/test_delta_channel_migration.py` (which
 covers `InMemorySaver` + a third-party fallback to the base default

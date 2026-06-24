@@ -23,7 +23,7 @@ test = [
 
 lint = [
   "ruff",
-  "codespell",
+  "black",
   "ty",
 ]
 dev = [
