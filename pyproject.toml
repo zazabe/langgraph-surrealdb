@@ -1,9 +1,12 @@
 [project]
 name = "langgraph-surrealdb"
 version = "0.1.0"
-description = "SurrealDB as LangGraph storage layer."
+description = "SurrealDB storage backend for LangGraph."
 readme = "README.md"
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ['LICENSE']
+
 dependencies = [
     "pydantic>=2.10.6",
     "langgraph>=1.1.6",
