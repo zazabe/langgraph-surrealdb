@@ -1,0 +1,32 @@
+services:
+  app:
+    image: mcr.microsoft.com/devcontainers/python:3.10
+    environment:
+      - UV_LINK_MODE=copy
+    volumes:
+      - ..:/workspaces/checkpoint:cached
+    command: sleep infinity
+    depends_on:
+      - surrealdb
+
+  surrealdb:
+    command: start --log info
+    image: docker.io/surrealdb/surrealdb:v3.1.4-dev
+    restart: unless-stopped
+    volumes:
+      - surrealdb-data:/data
+    environment:
+      SURREAL_USER: root
+      SURREAL_PASS: secret
+      SURREAL_PATH: rocksdb:/data/surreal.db
+      DEFAULT_NAMESPACE: langgraph
+      DEFAULT_DATABASE: checkpoint
+    healthcheck:
+      test: ["CMD-SHELL", "/surreal is-ready"]
+      interval: 5s
+      timeout: 30s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  surrealdb-data:

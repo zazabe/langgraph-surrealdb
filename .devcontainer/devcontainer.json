@@ -1,0 +1,27 @@
+{
+  "name": "langgraph-checkpoint-surreal",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/checkpoint",
+  "features": {
+    "ghcr.io/jsburckhardt/devcontainer-features/uv:1": {},
+    "ghcr.io/jsburckhardt/devcontainer-features/ruff:1": {}
+  },
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true,
+  "postCreateCommand": "uv sync",
+  "forwardPorts": [
+    "surrealdb:8000"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.debugpy",
+        "ms-python.black-formatter",
+        "tamasfe.even-better-toml",
+        "littlefoxteam.vscode-python-test-adapter"
+      ]
+    }
+  }
+}
