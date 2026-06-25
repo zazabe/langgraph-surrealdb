@@ -42,6 +42,33 @@ async with AsyncSurrealSaver.from_settings(settings) as checkpointer:
     ...
 ```
 
+## Initialize schema
+
+> [!IMPORTANT]
+> When using SurrealDB checkpointers for the first time, call a setup method
+> to create required tables and indexes before using saver operations.
+
+```python
+from langgraph_surrealdb import AsyncSurrealSaver, SurrealSaver, SurrealConnSettings
+
+settings = SurrealConnSettings(
+    url="ws://localhost:8000/rpc",
+    namespace="langgraph",
+    database="checkpoint",
+    username="root",
+    password="root",
+    token=None,
+)
+
+# one-time setup
+with SurrealSaver.from_settings(settings) as checkpointer:
+    checkpointer.setup()
+
+# async equivalent
+async with AsyncSurrealSaver.from_settings(settings) as checkpointer:
+    await checkpointer.setup()
+```
+
 ## Use with LangGraph (sync)
 
 ```python
@@ -53,6 +80,7 @@ builder = StateGraph(dict)
 # ... add nodes and edges ...
 
 with SurrealSaver.from_env() as checkpointer:
+    checkpointer.setup()
     graph = builder.compile(checkpointer=checkpointer)
     result = graph.invoke(
         {"input": "hello"},
@@ -70,6 +98,7 @@ builder = StateGraph(dict)
 # ... add nodes and edges ...
 
 async with AsyncSurrealSaver.from_env() as checkpointer:
+    await checkpointer.setup()
     graph = builder.compile(checkpointer=checkpointer)
     result = await graph.ainvoke(
         {"input": "hello"},

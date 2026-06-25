@@ -20,6 +20,10 @@ DEFINE FIELD IF NOT EXISTS checkpoint ON checkpoints TYPE bytes;
 DEFINE INDEX IF NOT EXISTS checkpoints_lookup ON checkpoints FIELDS thread_id, checkpoint_ns, checkpoint_id UNIQUE;
 """
 
+PROBE_QUERY = """
+INFO FOR TABLE checkpoints;
+"""
+
 SELECT_QUERY = """
 SELECT
     id,
@@ -43,6 +47,10 @@ class DbCheckpointsRepository:
 
     def setup(self) -> None:
         self._conn.query(SETUP_QUERY)
+
+    def probe(self) -> None:
+        raw = self._conn.query(PROBE_QUERY)
+        _validate_probe_result(raw)
 
     def upsert(self, checkpoint: DbCheckpoint) -> None:
         self._conn.upsert(checkpoint.id, checkpoint.model_dump())
@@ -97,6 +105,10 @@ class DbAsyncCheckpointsRepository:
 
     async def setup(self) -> None:
         await self._conn.query(SETUP_QUERY)
+
+    async def probe(self) -> None:
+        raw = await self._conn.query(PROBE_QUERY)
+        _validate_probe_result(raw)
 
     async def upsert(self, checkpoint: DbCheckpoint) -> None:
         id = checkpoint.id.to_record_id()
@@ -220,3 +232,28 @@ def _search_where(
                 params[pname] = parsed
 
     return str(clauses), params
+
+
+def _validate_probe_result(raw: Any) -> None:
+    if not isinstance(raw, dict):
+        raise RuntimeError("Missing checkpoints table schema. Call setup() first.")
+
+    info = raw
+    fields = info.get("fields")
+    indexes = info.get("indexes")
+
+    if not isinstance(fields, dict) or not isinstance(indexes, dict):
+        raise RuntimeError("Missing checkpoints table schema. Call setup() first.")
+
+    required_fields = {
+        "thread_id",
+        "checkpoint_ns",
+        "checkpoint_id",
+        "checkpoint",
+    }
+    required_indexes = {"checkpoints_lookup"}
+
+    if not required_fields.issubset(fields.keys()):
+        raise RuntimeError("Incomplete checkpoints fields. Call setup() first.")
+    if not required_indexes.issubset(indexes.keys()):
+        raise RuntimeError("Missing checkpoints indexes. Call setup() first.")

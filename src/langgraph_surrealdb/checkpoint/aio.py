@@ -146,8 +146,27 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
             await self.repo_writes.setup()
             self.is_setup = True
 
+    async def probe(self) -> None:
+        async with self.lock:
+            if self.is_setup:
+                return
+            await self.repo_checkpoints.probe()
+            await self.repo_writes.probe()
+            self.is_setup = True
+
+    async def _ensure_ready(self) -> None:
+        if self.is_setup:
+            return
+        try:
+            await self.probe()
+        except Exception as e:
+            raise RuntimeError(
+                "SurrealDB checkpoint schema is not initialized. "
+                "Call setup() on this saver instance before use."
+            ) from e
+
     async def aget_tuple(self, config: RunnableConfig) -> CheckpointTuple | None:
-        await self.setup()
+        await self._ensure_ready()
         configurable = config.get("configurable", {})
         checkpoint_id = configurable.get("checkpoint_id")
         checkpoint_ns = configurable.get("checkpoint_ns", "")
@@ -176,7 +195,7 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
         before: RunnableConfig | None = None,
         limit: int | None = None,
     ) -> AsyncIterator[CheckpointTuple]:
-        await self.setup()
+        await self._ensure_ready()
 
         configurable = config.get("configurable", {}) if config else {}
         thread_id = configurable.get("thread_id")
@@ -206,7 +225,7 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
         metadata: CheckpointMetadata,
         new_versions: ChannelVersions,
     ) -> RunnableConfig:
-        await self.setup()
+        await self._ensure_ready()
 
         db_checkpoint = DbCheckpoint.create(self.serde, config, checkpoint, metadata)
         async with self.lock:
@@ -220,7 +239,7 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
         task_id: str,
         task_path: str = "",
     ) -> None:
-        await self.setup()
+        await self._ensure_ready()
 
         replace = all(w[0] in WRITES_IDX_MAP for w in writes)
         configurable = config.get("configurable", {})
@@ -250,7 +269,7 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
                         await self.repo_writes.create(write)
 
     async def adelete_thread(self, thread_id: str) -> None:
-        await self.setup()
+        await self._ensure_ready()
         async with self.lock:
             await self.repo_checkpoints.delete_thread(thread_id)
             await self.repo_writes.delete_thread(thread_id)

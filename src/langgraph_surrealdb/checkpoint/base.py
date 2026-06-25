@@ -72,19 +72,39 @@ class SurrealSaver(BaseCheckpointSaver[str]):
             yield cls(conn)
 
     def setup(self) -> None:
+        with self.lock:
+            if self.is_setup:
+                return
+            self.repo_checkpoints.setup()
+            self.repo_writes.setup()
+            self.is_setup = True
+
+    def probe(self) -> None:
+        with self.lock:
+            if self.is_setup:
+                return
+            self.repo_checkpoints.probe()
+            self.repo_writes.probe()
+            self.is_setup = True
+
+    def _ensure_ready(self) -> None:
         if self.is_setup:
             return
-        self.repo_checkpoints.setup()
-        self.repo_writes.setup()
-        self.is_setup = True
+        try:
+            self.probe()
+        except Exception as e:
+            raise RuntimeError(
+                "SurrealDB checkpoint schema is not initialized. "
+                "Call setup() on this saver instance before use."
+            ) from e
 
     def get_tuple(self, config: RunnableConfig) -> CheckpointTuple | None:
         configurable = config.get("configurable", {})
         checkpoint_id = configurable.get("checkpoint_id")
         checkpoint_ns = configurable.get("checkpoint_ns", "")
         thread_id = configurable.get("thread_id", "")
+        self._ensure_ready()
         with self.lock:
-            self.setup()
             if checkpoint_id:
                 db_checkpoint_id = DbCheckpointId.from_ids(
                     thread_id, checkpoint_ns, checkpoint_id
@@ -115,8 +135,8 @@ class SurrealSaver(BaseCheckpointSaver[str]):
             before_configurable = before.get("configurable", {})
             before_checkpoint_id = before_configurable.get("checkpoint_id")
 
+        self._ensure_ready()
         with self.lock:
-            self.setup()
             checkpoints = self.repo_checkpoints.list(
                 thread_id,
                 checkpoint_ns,
@@ -136,8 +156,8 @@ class SurrealSaver(BaseCheckpointSaver[str]):
         new_versions: ChannelVersions,
     ) -> RunnableConfig:
         db_checkpoint = DbCheckpoint.create(self.serde, config, checkpoint, metadata)
+        self._ensure_ready()
         with self.lock:
-            self.setup()
             self.repo_checkpoints.upsert(db_checkpoint)
         return db_checkpoint.to_config()
 
@@ -154,8 +174,8 @@ class SurrealSaver(BaseCheckpointSaver[str]):
         checkpoint_ns = configurable.get("checkpoint_ns", "")
         checkpoint_id = configurable.get("checkpoint_id", "")
 
+        self._ensure_ready()
         with self.lock:
-            self.setup()
             for idx, (channel, value) in enumerate(writes):
                 use_idx = WRITES_IDX_MAP.get(channel, idx)
                 write = DbWrite.create(
@@ -177,8 +197,8 @@ class SurrealSaver(BaseCheckpointSaver[str]):
                         self.repo_writes.create(write)
 
     def delete_thread(self, thread_id: str) -> None:
+        self._ensure_ready()
         with self.lock:
-            self.setup()
             self.repo_checkpoints.delete_thread(thread_id)
             self.repo_writes.delete_thread(thread_id)
 
