@@ -1,4 +1,6 @@
-"""Smoke tests for `BaseCheckpointSaver.get_delta_channel_history` on sqlite.
+"""Smoke tests for `BaseCheckpointSaver.get_delta_channel_history` on SurrealDB.
+
+_ Note: Test copied from langgraph-checkpoint-sqlite and adjusted for SurrealDB._
 
 `SurrealSaver` (and `AsyncSurrealSaver`) deliberately don't override the
 default implementation in `BaseCheckpointSaver` — these tests pin the
@@ -23,7 +25,6 @@ from __future__ import annotations
 import operator
 from typing import Annotated, Any
 
-import pytest
 from langchain_core.runnables import RunnableConfig
 from langgraph.channels.delta import DeltaChannel
 from langgraph.checkpoint.serde.types import _DeltaSnapshot
@@ -34,16 +35,6 @@ from langgraph_surrealdb.checkpoint import (
     AsyncSurrealSaver,
     SurrealSaver,
 )
-
-# `langgraph` is not a dep of `langgraph-checkpoint-sqlite`. When tests run
-# in the sqlite lib's standalone CI environment without it installed, skip
-# the whole module rather than failing at import.
-pytest.importorskip("langgraph.channels.delta", reason="langgraph core not installed")
-pytest.importorskip("langgraph.graph", reason="langgraph core not installed")
-
-
-pytestmark = pytest.mark.anyio
-
 
 # ---------------------------------------------------------------------------
 # Graph helpers
