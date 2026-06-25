@@ -1,9 +1,11 @@
 """SurrealDB-specific migration smoke tests: BinaryOperatorAggregate -> DeltaChannel.
 
+_ Note: Test copied from langgraph-checkpoint-sqlite and adjusted for SurrealDB._
+
 Mirrors `libs/langgraph/tests/test_delta_channel_migration.py` (which
 covers `InMemorySaver` + a third-party fallback to the base default
 impl). This file exercises the same migration scenario through the
-sqlite-specific `SurrealSaver.get_delta_channel_history` override —
+SurrealDB-specific `SurrealSaver.get_delta_channel_history` override —
 specifically that the streaming ancestor walk finds a pre-migration
 plain `channel_values[ch]` entry and surfaces it as the `seed`, with
 post-migration writes folding on top through the reducer.
@@ -20,7 +22,6 @@ from __future__ import annotations
 import operator
 from typing import Annotated, Any
 
-import pytest
 from langchain_core.runnables import RunnableConfig
 from langgraph.channels.binop import BinaryOperatorAggregate
 from langgraph.channels.delta import DeltaChannel
@@ -28,15 +29,6 @@ from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
 from langgraph_surrealdb.checkpoint import AsyncSurrealSaver, SurrealSaver
-
-# `langgraph` core isn't a dep of `langgraph-checkpoint-sqlite`. Skip the
-# whole module rather than importerror-ing in the standalone CI shape.
-pytest.importorskip("langgraph.channels.delta", reason="langgraph core not installed")
-pytest.importorskip("langgraph.channels.binop", reason="langgraph core not installed")
-pytest.importorskip("langgraph.graph", reason="langgraph core not installed")
-
-
-pytestmark = pytest.mark.anyio
 
 
 def _noop(_state: Any) -> dict:

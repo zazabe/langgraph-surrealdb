@@ -1,7 +1,11 @@
+"""Test SurrealSaver.
+
+_ Note: Test copied from langgraph-checkpoint-sqlite and adjusted for SurrealDB._
+"""
+
 from typing import Any, cast
 
 import pytest
-from conftest import get_surreal_settings
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import (
     Checkpoint,
@@ -47,8 +51,8 @@ def test_dump():
 
 class TestSurrealSaver:
     @pytest.fixture(autouse=True)
-    def setup(self) -> None:
-        self.settings = get_surreal_settings()
+    def setup(self, settings) -> None:
+        self.settings = settings
         # objects for test setup
         self.config_1: RunnableConfig = {
             "configurable": {

@@ -1,21 +1,16 @@
-"""Run delta-channel conformance capabilities against AsyncSurrealSaver."""
+"""Run conformance capabilities against AsyncSurrealSaver."""
 
 from __future__ import annotations
 
 import pytest
+from langgraph.checkpoint.conformance import validate
+from langgraph.checkpoint.conformance.initializer import checkpointer_test
 
-pytest.importorskip(
-    "langgraph.checkpoint.conformance",
-    reason="langgraph-checkpoint-conformance not installed",
-)
+from langgraph_surrealdb.checkpoint import AsyncSurrealSaver
 
 
 @pytest.mark.asyncio
-async def test_delta_channel_conformance(settings):
-    from langgraph.checkpoint.conformance import validate
-    from langgraph.checkpoint.conformance.initializer import checkpointer_test
-
-    from langgraph_surrealdb.checkpoint import AsyncSurrealSaver
+async def test_async_conformance(settings):
 
     @checkpointer_test(name="AsyncSurrealSaver")
     async def sqlite_saver():
