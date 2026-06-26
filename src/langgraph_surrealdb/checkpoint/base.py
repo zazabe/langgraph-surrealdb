@@ -18,6 +18,12 @@ from langgraph.checkpoint.base import (
 )
 from langgraph.checkpoint.serde.base import SerializerProtocol
 
+from langgraph_surrealdb.checkpoint.config import (
+    CheckpointBeforeConfig,
+    CheckpointListFilterConfig,
+    CheckpointLookupConfig,
+    CheckpointWriteConfig,
+)
 from langgraph_surrealdb.database.common import (
     SurrealConnSettings,
     surreal_client,
@@ -99,10 +105,10 @@ class SurrealSaver(BaseCheckpointSaver[str]):
             ) from e
 
     def get_tuple(self, config: RunnableConfig) -> CheckpointTuple | None:
-        configurable = config.get("configurable", {})
-        checkpoint_id = configurable.get("checkpoint_id")
-        checkpoint_ns = configurable.get("checkpoint_ns", "")
-        thread_id = configurable.get("thread_id", "")
+        checkpoint_config = CheckpointLookupConfig.from_runnable_config(config)
+        checkpoint_id = checkpoint_config.checkpoint_id
+        checkpoint_ns = checkpoint_config.checkpoint_ns
+        thread_id = checkpoint_config.thread_id
         self._ensure_ready()
         with self.lock:
             if checkpoint_id:
@@ -126,14 +132,13 @@ class SurrealSaver(BaseCheckpointSaver[str]):
         before: RunnableConfig | None = None,
         limit: int | None = None,
     ) -> Iterator[CheckpointTuple]:
-        configurable = config.get("configurable", {}) if config else {}
-        thread_id = configurable.get("thread_id")
-        checkpoint_ns = configurable.get("checkpoint_ns")
-        checkpoint_id = configurable.get("checkpoint_id")
-        before_checkpoint_id = None
-        if before:
-            before_configurable = before.get("configurable", {})
-            before_checkpoint_id = before_configurable.get("checkpoint_id")
+        config_filter = CheckpointListFilterConfig.from_runnable_config(config)
+        thread_id = config_filter.thread_id
+        checkpoint_ns = config_filter.checkpoint_ns
+        checkpoint_id = config_filter.checkpoint_id
+        before_checkpoint_id = CheckpointBeforeConfig.from_runnable_config(
+            before
+        ).checkpoint_id
 
         self._ensure_ready()
         with self.lock:
@@ -169,10 +174,10 @@ class SurrealSaver(BaseCheckpointSaver[str]):
         task_path: str = "",
     ) -> None:
         replace = all(w[0] in WRITES_IDX_MAP for w in writes)
-        configurable = config.get("configurable", {})
-        thread_id = configurable.get("thread_id", "")
-        checkpoint_ns = configurable.get("checkpoint_ns", "")
-        checkpoint_id = configurable.get("checkpoint_id", "")
+        checkpoint_config = CheckpointWriteConfig.from_runnable_config(config)
+        thread_id = checkpoint_config.thread_id
+        checkpoint_ns = checkpoint_config.checkpoint_ns
+        checkpoint_id = checkpoint_config.checkpoint_id
 
         self._ensure_ready()
         with self.lock:
