@@ -18,6 +18,10 @@ from langgraph.checkpoint.base import (
 )
 from langgraph.checkpoint.serde.base import SerializerProtocol
 
+from langgraph_surrealdb.checkpoint.config import (
+    FullCheckpointConfig,
+    PartialCheckpointConfig,
+)
 from langgraph_surrealdb.database.common import (
     SurrealConnSettings,
     async_surreal_client,
@@ -167,10 +171,10 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
 
     async def aget_tuple(self, config: RunnableConfig) -> CheckpointTuple | None:
         await self._ensure_ready()
-        configurable = config.get("configurable", {})
-        checkpoint_id = configurable.get("checkpoint_id")
-        checkpoint_ns = configurable.get("checkpoint_ns", "")
-        thread_id = configurable.get("thread_id", "")
+        checkpoint_config = FullCheckpointConfig.from_config(config)
+        checkpoint_id = checkpoint_config.checkpoint_id
+        checkpoint_ns = checkpoint_config.checkpoint_ns
+        thread_id = checkpoint_config.thread_id
         async with self.lock:
             if checkpoint_id:
                 db_checkpoint_id = DbCheckpointId.from_ids(
@@ -197,14 +201,11 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
     ) -> AsyncIterator[CheckpointTuple]:
         await self._ensure_ready()
 
-        configurable = config.get("configurable", {}) if config else {}
-        thread_id = configurable.get("thread_id")
-        checkpoint_ns = configurable.get("checkpoint_ns")
-        checkpoint_id = configurable.get("checkpoint_id")
-        before_checkpoint_id = None
-        if before:
-            before_configurable = before.get("configurable", {})
-            before_checkpoint_id = before_configurable.get("checkpoint_id")
+        config_filter = PartialCheckpointConfig.from_config(config)
+        thread_id = config_filter.thread_id
+        checkpoint_ns = config_filter.checkpoint_ns
+        checkpoint_id = config_filter.checkpoint_id
+        before_checkpoint_id = PartialCheckpointConfig.from_config(before).checkpoint_id
 
         async with self.lock:
             checkpoints = await self.repo_checkpoints.list(
@@ -242,10 +243,10 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
         await self._ensure_ready()
 
         replace = all(w[0] in WRITES_IDX_MAP for w in writes)
-        configurable = config.get("configurable", {})
-        thread_id = configurable.get("thread_id", "")
-        checkpoint_ns = configurable.get("checkpoint_ns", "")
-        checkpoint_id = configurable.get("checkpoint_id", "")
+        checkpoint_config = FullCheckpointConfig.from_config(config)
+        thread_id = checkpoint_config.thread_id
+        checkpoint_ns = checkpoint_config.checkpoint_ns
+        checkpoint_id = checkpoint_config.require_checkpoint_id()
 
         async with self.lock:
             for idx, (channel, value) in enumerate(writes):
