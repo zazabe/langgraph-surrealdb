@@ -24,43 +24,26 @@ class _ConfigurableModel(BaseModel):
         return configurable
 
 
-class CheckpointLookupConfig(_ConfigurableModel):
+class FullCheckpointConfig(_ConfigurableModel):
     thread_id: NonEmptyStr
     checkpoint_ns: NamespaceStr = ""
     checkpoint_id: NonEmptyStr | None = None
 
     @classmethod
-    def from_runnable_config(cls, config: RunnableConfig) -> CheckpointLookupConfig:
+    def from_config(cls, config: RunnableConfig) -> FullCheckpointConfig:
         return cls.model_validate(cls._extract_configurable(config))
 
-
-class CheckpointWriteConfig(_ConfigurableModel):
-    thread_id: NonEmptyStr
-    checkpoint_ns: NamespaceStr = ""
-    checkpoint_id: NonEmptyStr
-
-    @classmethod
-    def from_runnable_config(cls, config: RunnableConfig) -> CheckpointWriteConfig:
-        return cls.model_validate(cls._extract_configurable(config))
+    def require_checkpoint_id(self) -> NonEmptyStr:
+        if self.checkpoint_id is None:
+            raise ValueError("config['configurable']['checkpoint_id'] is required")
+        return self.checkpoint_id
 
 
-class CheckpointListFilterConfig(_ConfigurableModel):
+class PartialCheckpointConfig(_ConfigurableModel):
     thread_id: NonEmptyStr | None = None
     checkpoint_ns: NamespaceStr | None = None
     checkpoint_id: NonEmptyStr | None = None
 
     @classmethod
-    def from_runnable_config(
-        cls, config: RunnableConfig | None
-    ) -> CheckpointListFilterConfig:
-        return cls.model_validate(cls._extract_configurable(config))
-
-
-class CheckpointBeforeConfig(_ConfigurableModel):
-    checkpoint_id: NonEmptyStr | None = None
-
-    @classmethod
-    def from_runnable_config(
-        cls, config: RunnableConfig | None
-    ) -> CheckpointBeforeConfig:
+    def from_config(cls, config: RunnableConfig | None) -> PartialCheckpointConfig:
         return cls.model_validate(cls._extract_configurable(config))

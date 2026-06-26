@@ -7,7 +7,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import empty_checkpoint
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
-from langgraph_surrealdb.checkpoint.config import CheckpointLookupConfig
+from langgraph_surrealdb.checkpoint.config import FullCheckpointConfig
 from langgraph_surrealdb.database.models.checkpoint import DbCheckpoint
 from langgraph_surrealdb.database.models.write import DbWrite
 
@@ -87,7 +87,7 @@ def test_db_write_create_and_pending_write_round_trip() -> None:
     )
 
 
-def test_checkpoint_lookup_config_allows_extra_arbitrary_types() -> None:
+def test_full_checkpoint_config_allows_extra_arbitrary_types() -> None:
     class ArbitraryType:
         pass
 
@@ -101,10 +101,23 @@ def test_checkpoint_lookup_config_allows_extra_arbitrary_types() -> None:
         }
     }
 
-    parsed = CheckpointLookupConfig.from_runnable_config(config)
+    parsed = FullCheckpointConfig.from_config(config)
 
     assert parsed.thread_id == "thread-1"
     assert parsed.checkpoint_ns == "ns-1"
     assert parsed.model_extra is not None
     assert parsed.model_extra["arbitrary_type"] is arbitrary_type
     assert parsed.model_extra["step_count"] == 3
+
+
+def test_full_checkpoint_config_require_checkpoint_id() -> None:
+    config: RunnableConfig = {
+        "configurable": {
+            "thread_id": "thread-1",
+            "checkpoint_ns": "ns-1",
+        }
+    }
+    parsed = FullCheckpointConfig.from_config(config)
+
+    with pytest.raises(ValueError, match="checkpoint_id"):
+        parsed.require_checkpoint_id()

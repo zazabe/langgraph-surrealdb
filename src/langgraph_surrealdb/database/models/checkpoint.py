@@ -8,7 +8,7 @@ from langgraph.checkpoint.serde.base import SerializerProtocol
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import Self
 
-from langgraph_surrealdb.checkpoint.config import CheckpointLookupConfig
+from langgraph_surrealdb.checkpoint.config import FullCheckpointConfig
 from langgraph_surrealdb.database.models import DbRecordId
 
 
@@ -44,7 +44,7 @@ class DbCheckpoint(BaseModel):
         checkpoint: Checkpoint,
         metadata: CheckpointMetadata,
     ) -> Self:
-        checkpoint_config = CheckpointLookupConfig.from_runnable_config(config)
+        checkpoint_config = FullCheckpointConfig.from_config(config)
         thread_id = checkpoint_config.thread_id
         checkpoint_ns = checkpoint_config.checkpoint_ns
         parent_checkpoint_id = checkpoint_config.checkpoint_id or ""

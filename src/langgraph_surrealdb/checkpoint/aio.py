@@ -19,10 +19,8 @@ from langgraph.checkpoint.base import (
 from langgraph.checkpoint.serde.base import SerializerProtocol
 
 from langgraph_surrealdb.checkpoint.config import (
-    CheckpointBeforeConfig,
-    CheckpointListFilterConfig,
-    CheckpointLookupConfig,
-    CheckpointWriteConfig,
+    FullCheckpointConfig,
+    PartialCheckpointConfig,
 )
 from langgraph_surrealdb.database.common import (
     SurrealConnSettings,
@@ -173,7 +171,7 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
 
     async def aget_tuple(self, config: RunnableConfig) -> CheckpointTuple | None:
         await self._ensure_ready()
-        checkpoint_config = CheckpointLookupConfig.from_runnable_config(config)
+        checkpoint_config = FullCheckpointConfig.from_config(config)
         checkpoint_id = checkpoint_config.checkpoint_id
         checkpoint_ns = checkpoint_config.checkpoint_ns
         thread_id = checkpoint_config.thread_id
@@ -203,13 +201,11 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
     ) -> AsyncIterator[CheckpointTuple]:
         await self._ensure_ready()
 
-        config_filter = CheckpointListFilterConfig.from_runnable_config(config)
+        config_filter = PartialCheckpointConfig.from_config(config)
         thread_id = config_filter.thread_id
         checkpoint_ns = config_filter.checkpoint_ns
         checkpoint_id = config_filter.checkpoint_id
-        before_checkpoint_id = CheckpointBeforeConfig.from_runnable_config(
-            before
-        ).checkpoint_id
+        before_checkpoint_id = PartialCheckpointConfig.from_config(before).checkpoint_id
 
         async with self.lock:
             checkpoints = await self.repo_checkpoints.list(
@@ -247,10 +243,10 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
         await self._ensure_ready()
 
         replace = all(w[0] in WRITES_IDX_MAP for w in writes)
-        checkpoint_config = CheckpointWriteConfig.from_runnable_config(config)
+        checkpoint_config = FullCheckpointConfig.from_config(config)
         thread_id = checkpoint_config.thread_id
         checkpoint_ns = checkpoint_config.checkpoint_ns
-        checkpoint_id = checkpoint_config.checkpoint_id
+        checkpoint_id = checkpoint_config.require_checkpoint_id()
 
         async with self.lock:
             for idx, (channel, value) in enumerate(writes):
