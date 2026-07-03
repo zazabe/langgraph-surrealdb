@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import uuid
+from collections.abc import Generator
 from dataclasses import replace
 
 import pytest
@@ -40,19 +41,31 @@ def settings(
     base_settings: SurrealConnSettings,
     run_id: str,
     request: pytest.FixtureRequest,
-) -> SurrealConnSettings:
+) -> Generator[SurrealConnSettings, None, None]:
     worker_id = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
     module_name = request.module.__name__
     module_db = (
         f"{base_settings.database}_{run_id}_{worker_id}_{_module_slug(module_name)}"
     )
-    return replace(base_settings, database=module_db)
+    module_settings = replace(base_settings, database=module_db)
+    yield module_settings
+    _drop_database(base_settings, module_db)
 
 
 def _clear_tables(settings: SurrealConnSettings) -> None:
     with surreal_client(settings) as conn:
         conn.query("DELETE checkpoints;")
         conn.query("DELETE writes;")
+
+
+def _drop_database(
+    control_settings: SurrealConnSettings,
+    database_name: str,
+) -> None:
+    if database_name == control_settings.database:
+        return
+    with surreal_client(control_settings) as conn:
+        conn.query(f"REMOVE DATABASE `{database_name}`;")
 
 
 @pytest.fixture(autouse=True)
