@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.1](https://github.com/zazabe/langgraph-surrealdb/compare/langgraph-surrealdb-v0.2.0...langgraph-surrealdb-v0.2.1) (2026-07-03)
+
+
+### Refactoring
+
+* Consolidate release and publish workflows ([#7](https://github.com/zazabe/langgraph-surrealdb/issues/7)) ([9ee0823](https://github.com/zazabe/langgraph-surrealdb/commit/9ee0823158e4091088a1dcc64f4dd3e5b83f8db3))
+
+
+### Chores
+
+* Update release configuration and workflow ([#8](https://github.com/zazabe/langgraph-surrealdb/issues/8)) ([c4a96d3](https://github.com/zazabe/langgraph-surrealdb/commit/c4a96d35bc1c87ad904a7ebe66d8c58217137b0a))
+
 ## [0.2.0](https://github.com/zazabe/langgraph-surrealdb/compare/langgraph-surrealdb-v0.1.0...langgraph-surrealdb-v0.2.0) (2026-07-03)
 
 
