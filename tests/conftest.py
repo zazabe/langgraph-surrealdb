@@ -4,18 +4,17 @@ import os
 import re
 import uuid
 from collections.abc import Generator
-from dataclasses import replace
 
 import pytest
 
 from langgraph_surrealdb.checkpoint import SurrealSaver
 from langgraph_surrealdb.database import surreal_client
-from langgraph_surrealdb.database.common import SurrealConnSettings
+from langgraph_surrealdb.database.common import SurrealSaverSettings
 
 
-def get_surreal_settings() -> SurrealConnSettings:
+def get_surreal_settings() -> SurrealSaverSettings:
     try:
-        return SurrealConnSettings.from_env()
+        return SurrealSaverSettings.from_env()
     except ValueError as e:
         pytest.skip(
             f"Set SURREAL_URL, SURREAL_NS, SURREAL_DB, SURREAL_USER, and SURREAL_PASS to run SurrealDB integration tests: {e}"
@@ -27,7 +26,7 @@ def _module_slug(module_name: str) -> str:
 
 
 @pytest.fixture(scope="session")
-def base_settings() -> SurrealConnSettings:
+def base_settings() -> SurrealSaverSettings:
     return get_surreal_settings()
 
 
@@ -38,31 +37,32 @@ def run_id() -> str:
 
 @pytest.fixture(scope="module")
 def settings(
-    base_settings: SurrealConnSettings,
+    base_settings: SurrealSaverSettings,
     run_id: str,
     request: pytest.FixtureRequest,
-) -> Generator[SurrealConnSettings, None, None]:
+) -> Generator[SurrealSaverSettings, None, None]:
     worker_id = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
     module_name = request.module.__name__
     module_db = (
-        f"{base_settings.database}_{run_id}_{worker_id}_{_module_slug(module_name)}"
+        f"{base_settings.db.database}_{run_id}_{worker_id}_{_module_slug(module_name)}"
     )
-    module_settings = replace(base_settings, database=module_db)
+    db_settings = base_settings.db.model_copy(update={"database": module_db})
+    module_settings = base_settings.model_copy(update={"db": db_settings})
     yield module_settings
     _drop_database(base_settings, module_db)
 
 
-def _clear_tables(settings: SurrealConnSettings) -> None:
+def _clear_tables(settings: SurrealSaverSettings) -> None:
     with surreal_client(settings) as conn:
         conn.query("DELETE checkpoints;")
         conn.query("DELETE writes;")
 
 
 def _drop_database(
-    control_settings: SurrealConnSettings,
+    control_settings: SurrealSaverSettings,
     database_name: str,
 ) -> None:
-    if database_name == control_settings.database:
+    if database_name == control_settings.db.database:
         return
     with surreal_client(control_settings) as conn:
         conn.query(f"REMOVE DATABASE `{database_name}`;")
@@ -70,7 +70,7 @@ def _drop_database(
 
 @pytest.fixture(autouse=True)
 def cleanup_checkpoint_tables(
-    settings: SurrealConnSettings,
+    settings: SurrealSaverSettings,
 ):
     with SurrealSaver.from_settings(settings) as saver:
         saver.setup()

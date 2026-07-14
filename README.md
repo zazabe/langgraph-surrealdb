@@ -18,21 +18,32 @@ export SURREAL_NS="langgraph"
 export SURREAL_DB="checkpoint"
 export SURREAL_USER="root"
 export SURREAL_PASS="root"
-export SURREAL_TOKEN=""
+export SURREAL_ACCESS="method" # for user-record auth
+export SURREAL_TOKEN="xyz" # for token based auth
 ```
 
 Or create the saver directly from settings:
 
 ```python
-from langgraph_surrealdb import AsyncSurrealSaver, SurrealSaver, SurrealConnSettings
+from langgraph_surrealdb import (
+    AsyncSurrealSaver,
+    RootAuth,
+    SurrealSaver,
+    SurrealSaverSettings,
+    SurrealSaverDatabaseSettings,
+)
 
-settings = SurrealConnSettings(
-    url="ws://localhost:8000/rpc",
-    namespace="langgraph",
-    database="checkpoint",
-    username="root",
-    password="root",
-    token=None,
+settings = SurrealSaverSettings(
+    db=SurrealSaverDatabaseSettings(
+        url="ws://localhost:8000/rpc",
+        namespace="langgraph",
+        database="checkpoint",
+        # supports RootAuth, TokenAuth and RecordAuth
+        auth=RootAuth(
+            username="root",
+            password="root"
+        )
+    )
 )
 
 with SurrealSaver.from_settings(settings) as checkpointer:
@@ -49,23 +60,12 @@ async with AsyncSurrealSaver.from_settings(settings) as checkpointer:
 > to create required tables and indexes before using saver operations.
 
 ```python
-from langgraph_surrealdb import AsyncSurrealSaver, SurrealSaver, SurrealConnSettings
-
-settings = SurrealConnSettings(
-    url="ws://localhost:8000/rpc",
-    namespace="langgraph",
-    database="checkpoint",
-    username="root",
-    password="root",
-    token=None,
-)
-
 # one-time setup
-with SurrealSaver.from_settings(settings) as checkpointer:
+with SurrealSaver.from_env() as checkpointer:
     checkpointer.setup()
 
 # async equivalent
-async with AsyncSurrealSaver.from_settings(settings) as checkpointer:
+async with AsyncSurrealSaver.from_env() as checkpointer:
     await checkpointer.setup()
 ```
 
