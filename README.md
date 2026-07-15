@@ -1,3 +1,8 @@
+[![ci](https://github.com/zazabe/langgraph-surrealdb/actions/workflows/ci.yml/badge.svg)](https://github.com/zazabe/langgraph-surrealdb/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/langgraph-surrealdb)](https://pypi.org/project/langgraph-surrealdb/)
+![License](https://img.shields.io/pypi/l/langgraph-surrealdb)
+
+
 # LangGraph Checkpoint for SurrealDB
 
 SurrealDB-backed checkpointers for LangGraph.
