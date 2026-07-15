@@ -27,6 +27,9 @@ jobs:
     name: Tests
     runs-on: ubuntu-22.04
     timeout-minutes: 15
+    strategy:
+      matrix:
+        auth_mode: [root, record, token]
     env:
       SURREAL_URL: ws://127.0.0.1:8000
       SURREAL_NS: langgraph
@@ -67,6 +70,44 @@ jobs:
           echo "SurrealDB did not become healthy in time."
           docker logs "${{ job.services.surrealdb.id }}" || true
           exit 1
-      - name: Run tests
-        shell: bash
+      - name: Run tests (root)
+        if: matrix.auth_mode == 'root'
+        env:
+          LANGGRAPH_SURREALDB_URL: "${{ env.SURREAL_URL }}"
+          LANGGRAPH_SURREALDB_NS: "${{ env.SURREAL_NS }}"
+          LANGGRAPH_SURREALDB_TEST_ROOT_USER: "${{ env.SURREAL_USER }}"
+          LANGGRAPH_SURREALDB_TEST_ROOT_PASSWORD: "${{ env.SURREAL_PASS }}"
+          LANGGRAPH_SURREALDB_DB: ci_root
+          LANGGRAPH_SURREALDB_AUTH_MODE: root
+          LANGGRAPH_SURREALDB_USER: ${{ env.SURREAL_USER }}
+          LANGGRAPH_SURREALDB_PASSWORD: ${{ env.SURREAL_PASS }}
         run: uv run pytest -q
+      - name: Run tests (record)
+        if: matrix.auth_mode == 'record'
+        env:
+          LANGGRAPH_SURREALDB_URL: "${{ env.SURREAL_URL }}"
+          LANGGRAPH_SURREALDB_NS: "${{ env.SURREAL_NS }}"
+          LANGGRAPH_SURREALDB_TEST_ROOT_USER: "${{ env.SURREAL_USER }}"
+          LANGGRAPH_SURREALDB_TEST_ROOT_PASSWORD: "${{ env.SURREAL_PASS }}"
+          LANGGRAPH_SURREALDB_DB: ci_record
+          LANGGRAPH_SURREALDB_AUTH_MODE: record
+          LANGGRAPH_SURREALDB_USER: pytest
+          LANGGRAPH_SURREALDB_PASSWORD: pytest
+          LANGGRAPH_SURREALDB_ACCESS: auth
+        run: uv run pytest -q
+      - name: Run tests (token)
+        if: matrix.auth_mode == 'token'
+        env:
+          LANGGRAPH_SURREALDB_URL: "${{ env.SURREAL_URL }}"
+          LANGGRAPH_SURREALDB_NS: "${{ env.SURREAL_NS }}"
+          LANGGRAPH_SURREALDB_TEST_ROOT_USER: "${{ env.SURREAL_USER }}"
+          LANGGRAPH_SURREALDB_TEST_ROOT_PASSWORD: "${{ env.SURREAL_PASS }}"
+          LANGGRAPH_SURREALDB_DB: ci_token
+          LANGGRAPH_SURREALDB_AUTH_MODE: token
+        run: |
+          TOKEN="$(curl -sS -X POST "http://127.0.0.1:8000/signin" \
+                  -H "Content-Type: application/json" \
+                  -d '{"user":"${{ env.SURREAL_USER }}","pass":"${{ env.SURREAL_PASS }}"}' | \
+                  jq -r .token)"
+          export LANGGRAPH_SURREALDB_TOKEN="$TOKEN"
+          uv run pytest -q
