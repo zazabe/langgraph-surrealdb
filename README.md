@@ -10,29 +10,52 @@ pip install langgraph-surrealdb
 
 ## Configure SurrealDB
 
-Set these environment variables:
+Set these environment variables (prefix: `LANGGRAPH_SURREALDB_`):
 
 ```bash
-export SURREAL_URL="ws://localhost:8000/rpc"
-export SURREAL_NS="langgraph"
-export SURREAL_DB="checkpoint"
-export SURREAL_USER="root"
-export SURREAL_PASS="root"
-export SURREAL_TOKEN=""
+# required for all modes
+export LANGGRAPH_SURREALDB_URL="ws://localhost:8000/rpc"
+export LANGGRAPH_SURREALDB_NS="langgraph"
+export LANGGRAPH_SURREALDB_DB="checkpoint"
+
+# root mode
+export LANGGRAPH_SURREALDB_AUTH_MODE="root"
+export LANGGRAPH_SURREALDB_USER="root"
+export LANGGRAPH_SURREALDB_PASSWORD="pass"
+
+# record mode
+# export LANGGRAPH_SURREALDB_AUTH_MODE="record"
+# export LANGGRAPH_SURREALDB_USER="user"
+# export LANGGRAPH_SURREALDB_PASSWORD="pass"
+# export LANGGRAPH_SURREALDB_ACCESS="method"
+
+# token mode
+# export LANGGRAPH_SURREALDB_AUTH_MODE="token"
+# export LANGGRAPH_SURREALDB_TOKEN="xyz"
 ```
 
 Or create the saver directly from settings:
 
 ```python
-from langgraph_surrealdb import AsyncSurrealSaver, SurrealSaver, SurrealConnSettings
+from langgraph_surrealdb import (
+    AsyncSurrealSaver,
+    RootAuth,
+    SurrealSaver,
+    SurrealSaverSettings,
+    SurrealSaverDatabaseSettings,
+)
 
-settings = SurrealConnSettings(
-    url="ws://localhost:8000/rpc",
-    namespace="langgraph",
-    database="checkpoint",
-    username="root",
-    password="root",
-    token=None,
+settings = SurrealSaverSettings(
+    db=SurrealSaverDatabaseSettings(
+        url="ws://localhost:8000/rpc",
+        namespace="langgraph",
+        database="checkpoint",
+        # supports RootAuth, TokenAuth and RecordAuth
+        auth=RootAuth(
+            username="root",
+            password="root"
+        )
+    )
 )
 
 with SurrealSaver.from_settings(settings) as checkpointer:
@@ -49,23 +72,12 @@ async with AsyncSurrealSaver.from_settings(settings) as checkpointer:
 > to create required tables and indexes before using saver operations.
 
 ```python
-from langgraph_surrealdb import AsyncSurrealSaver, SurrealSaver, SurrealConnSettings
-
-settings = SurrealConnSettings(
-    url="ws://localhost:8000/rpc",
-    namespace="langgraph",
-    database="checkpoint",
-    username="root",
-    password="root",
-    token=None,
-)
-
 # one-time setup
-with SurrealSaver.from_settings(settings) as checkpointer:
+with SurrealSaver.from_env() as checkpointer:
     checkpointer.setup()
 
 # async equivalent
-async with AsyncSurrealSaver.from_settings(settings) as checkpointer:
+async with AsyncSurrealSaver.from_env() as checkpointer:
     await checkpointer.setup()
 ```
 

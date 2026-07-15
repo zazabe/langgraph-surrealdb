@@ -6,13 +6,14 @@ from langgraph_surrealdb.database import (
     SurrealConnection,
 )
 from langgraph_surrealdb.database.common import select_result
+from langgraph_surrealdb.database.interface import QueryRawResult
 from langgraph_surrealdb.database.models.checkpoint import (
     DbCheckpoint,
     DbCheckpointId,
 )
 
 SETUP_QUERY = """
-DEFINE TABLE IF NOT EXISTS checkpoints SCHEMALESS;
+DEFINE TABLE IF NOT EXISTS checkpoints SCHEMALESS PERMISSIONS FULL;
 DEFINE FIELD IF NOT EXISTS thread_id ON checkpoints TYPE string;
 DEFINE FIELD IF NOT EXISTS checkpoint_ns ON checkpoints TYPE string;
 DEFINE FIELD IF NOT EXISTS checkpoint_id ON checkpoints TYPE string;
@@ -21,7 +22,7 @@ DEFINE INDEX IF NOT EXISTS checkpoints_lookup ON checkpoints FIELDS thread_id, c
 """
 
 PROBE_QUERY = """
-INFO FOR TABLE checkpoints;
+SELECT count() FROM checkpoints GROUP ALL;
 """
 
 SELECT_QUERY = """
@@ -49,8 +50,13 @@ class DbCheckpointsRepository:
         self._conn.query(SETUP_QUERY)
 
     def probe(self) -> None:
-        raw = self._conn.query(PROBE_QUERY)
-        _validate_probe_result(raw)
+        raw: QueryRawResult[dict[str, int]] = self._conn.query_raw(PROBE_QUERY)
+        first = raw.first()
+        if not first or first.status == "ERR":
+            error = first.result if first else "Unknown error"
+            raise RuntimeError(
+                f"Failed to probe checkpoints table. Call setup() first, error: {error}"
+            )
 
     def upsert(self, checkpoint: DbCheckpoint) -> None:
         self._conn.upsert(checkpoint.id, checkpoint.model_dump())
@@ -107,8 +113,13 @@ class DbAsyncCheckpointsRepository:
         await self._conn.query(SETUP_QUERY)
 
     async def probe(self) -> None:
-        raw = await self._conn.query(PROBE_QUERY)
-        _validate_probe_result(raw)
+        raw: QueryRawResult[dict[str, int]] = await self._conn.query_raw(PROBE_QUERY)
+        first = raw.first()
+        if not first or first.status == "ERR":
+            error = first.result if first else "Unknown error"
+            raise RuntimeError(
+                f"Failed to probe checkpoints table. Call setup() first, error: {error}"
+            )
 
     async def upsert(self, checkpoint: DbCheckpoint) -> None:
         id = checkpoint.id.to_record_id()
@@ -232,28 +243,3 @@ def _search_where(
                 params[pname] = parsed
 
     return str(clauses), params
-
-
-def _validate_probe_result(raw: Any) -> None:
-    if not isinstance(raw, dict):
-        raise RuntimeError("Missing checkpoints table schema. Call setup() first.")
-
-    info = raw
-    fields = info.get("fields")
-    indexes = info.get("indexes")
-
-    if not isinstance(fields, dict) or not isinstance(indexes, dict):
-        raise RuntimeError("Missing checkpoints table schema. Call setup() first.")
-
-    required_fields = {
-        "thread_id",
-        "checkpoint_ns",
-        "checkpoint_id",
-        "checkpoint",
-    }
-    required_indexes = {"checkpoints_lookup"}
-
-    if not required_fields.issubset(fields.keys()):
-        raise RuntimeError("Incomplete checkpoints fields. Call setup() first.")
-    if not required_indexes.issubset(indexes.keys()):
-        raise RuntimeError("Missing checkpoints indexes. Call setup() first.")

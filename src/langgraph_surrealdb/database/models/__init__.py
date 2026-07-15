@@ -1,10 +1,9 @@
 import hashlib
-from typing import ClassVar
+from typing import ClassVar, Self
 
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
 from surrealdb import RecordID
-from typing_extensions import Self
 
 
 class DbRecordId(str):

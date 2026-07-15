@@ -3,7 +3,7 @@
 _ Note: Test copied from langgraph-checkpoint-sqlite and adjusted for SurrealDB._
 """
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from langchain_core.runnables import RunnableConfig
@@ -49,18 +49,24 @@ class TestAsyncSurrealSaver:
         self.chkpnt_2: Checkpoint = create_checkpoint(self.chkpnt_1, {}, 1)
         self.chkpnt_3: Checkpoint = empty_checkpoint()
 
-        self.metadata_1: CheckpointMetadata = {
-            "source": "input",
-            "step": 2,
-            "writes": {},
-            "score": 1,
-        }
-        self.metadata_2: CheckpointMetadata = {
-            "source": "loop",
-            "step": 1,
-            "writes": {"foo": "bar"},
-        }
-        self.metadata_3: CheckpointMetadata = {}
+        self.metadata_1 = cast(
+            CheckpointMetadata,
+            {
+                "source": "input",
+                "step": 2,
+                "writes": {},
+                "score": 1,
+            },
+        )
+        self.metadata_2 = cast(
+            CheckpointMetadata,
+            {
+                "source": "loop",
+                "step": 1,
+                "writes": {"foo": "bar"},
+            },
+        )
+        self.metadata_3 = cast(CheckpointMetadata, {})
 
     async def test_combined_metadata(self) -> None:
         async with AsyncSurrealSaver.from_settings(self.settings) as saver:
@@ -118,8 +124,12 @@ class TestAsyncSurrealSaver:
             ]
             assert len(search_results_5) == 2
             assert {
-                search_results_5[0].config["configurable"]["checkpoint_ns"],
-                search_results_5[1].config["configurable"]["checkpoint_ns"],
+                search_results_5[0]
+                .config.get("configurable", {})
+                .get("checkpoint_ns", ""),
+                search_results_5[1]
+                .config.get("configurable", {})
+                .get("checkpoint_ns", ""),
             } == {"", "inner"}
 
             # Test limit param
@@ -130,14 +140,20 @@ class TestAsyncSurrealSaver:
                 )
             ]
             assert len(search_results_6) == 1
-            assert search_results_6[0].config["configurable"]["thread_id"] == "thread-2"
+            assert (
+                search_results_6[0].config.get("configurable", {}).get("thread_id", "")
+                == "thread-2"
+            )
 
             # Test before param
             search_results_7 = [
                 c async for c in saver.alist(None, before=search_results_5[1].config)
             ]
             assert len(search_results_7) == 1
-            assert search_results_7[0].config["configurable"]["thread_id"] == "thread-1"
+            assert (
+                search_results_7[0].config.get("configurable", {}).get("thread_id", "")
+                == "thread-1"
+            )
 
     async def test_limit_parameter_sql_injection_prevention(self) -> None:
         """Test that the limit parameter properly uses parameterized queries to prevent SQL injection."""
@@ -151,7 +167,12 @@ class TestAsyncSurrealSaver:
                     }
                 }
                 checkpoint = empty_checkpoint()
-                metadata: CheckpointMetadata = {"index": i}
+                metadata = cast(
+                    CheckpointMetadata,
+                    {
+                        "index": i,
+                    },
+                )
                 await saver.aput(config, checkpoint, metadata, {})
 
             # Test that limit works correctly with valid integer
@@ -185,7 +206,7 @@ class TestAsyncSurrealSaver:
                     results = [
                         c
                         # type: ignore
-                        async for c in saver.alist(None, limit=malicious_limit)
+                        async for c in saver.alist(None, limit=int(malicious_limit))
                     ]
                     # If it doesn't raise an error, it should at least not execute the injection
                     # SQLite's parameter binding will try to convert the string to an integer

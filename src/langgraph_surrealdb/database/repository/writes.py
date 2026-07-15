@@ -1,14 +1,13 @@
-from typing import Any
-
 from langgraph_surrealdb.database import (
     SurrealAsyncConnection,
     SurrealConnection,
 )
 from langgraph_surrealdb.database.common import select_result
+from langgraph_surrealdb.database.interface import QueryRawResult
 from langgraph_surrealdb.database.models.write import DbWrite, DbWriteId
 
 SETUP_QUERY = """
-DEFINE TABLE IF NOT EXISTS writes SCHEMALESS;
+DEFINE TABLE IF NOT EXISTS writes SCHEMALESS PERMISSIONS FULL;
 DEFINE FIELD IF NOT EXISTS thread_id ON writes TYPE string;
 DEFINE FIELD IF NOT EXISTS checkpoint_ns ON writes TYPE string;
 DEFINE FIELD IF NOT EXISTS checkpoint_id ON writes TYPE string;
@@ -20,7 +19,7 @@ DEFINE INDEX IF NOT EXISTS writes_lookup ON writes FIELDS thread_id, checkpoint_
 """
 
 PROBE_QUERY = """
-INFO FOR TABLE writes;
+SELECT count() FROM writes GROUP ALL;
 """
 
 SELECT_QUERY = """
@@ -50,8 +49,13 @@ class DbWritesRepository:
         self._conn.query(SETUP_QUERY)
 
     def probe(self) -> None:
-        raw = self._conn.query(PROBE_QUERY)
-        _validate_probe_result(raw)
+        raw: QueryRawResult[dict[str, int]] = self._conn.query_raw(PROBE_QUERY)
+        first = raw.first()
+        if not first or first.status == "ERR":
+            error = first.result if first else "Unknown error"
+            raise RuntimeError(
+                f"Failed to probe writes table. Call setup() first, error: {error}"
+            )
 
     def create(self, write: DbWrite) -> None:
         self._conn.create(write.id, write.model_dump())
@@ -95,8 +99,13 @@ class DbAsyncWritesRepository:
         await self._conn.query(SETUP_QUERY)
 
     async def probe(self) -> None:
-        raw = await self._conn.query(PROBE_QUERY)
-        _validate_probe_result(raw)
+        raw: QueryRawResult[dict[str, int]] = await self._conn.query_raw(PROBE_QUERY)
+        first = raw.first()
+        if not first or first.status == "ERR":
+            error = first.result if first else "Unknown error"
+            raise RuntimeError(
+                f"Failed to probe writes table. Call setup() first, error: {error}"
+            )
 
     async def create(self, write: DbWrite) -> None:
         await self._conn.create(write.id, write.model_dump())
@@ -128,28 +137,3 @@ class DbAsyncWritesRepository:
             "DELETE FROM writes WHERE thread_id = $thread_id",
             {"thread_id": thread_id},
         )
-
-
-def _validate_probe_result(raw: Any) -> None:
-    if not isinstance(raw, dict):
-        raise RuntimeError("Missing writes table schema. Call setup() first.")
-
-    fields = raw.get("fields")
-    indexes = raw.get("indexes")
-    if not isinstance(fields, dict) or not isinstance(indexes, dict):
-        raise RuntimeError("Missing writes table schema. Call setup() first.")
-
-    required_fields = {
-        "thread_id",
-        "checkpoint_ns",
-        "checkpoint_id",
-        "task_id",
-        "idx",
-        "channel",
-        "value",
-    }
-    required_indexes = {"writes_lookup"}
-    if not required_fields.issubset(fields.keys()):
-        raise RuntimeError("Incomplete writes fields. Call setup() first.")
-    if not required_indexes.issubset(indexes.keys()):
-        raise RuntimeError("Missing writes indexes. Call setup() first.")

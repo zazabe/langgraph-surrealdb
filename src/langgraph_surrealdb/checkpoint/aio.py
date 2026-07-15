@@ -23,7 +23,7 @@ from langgraph_surrealdb.checkpoint.config import (
     PartialCheckpointConfig,
 )
 from langgraph_surrealdb.database.common import (
-    SurrealConnSettings,
+    SurrealSaverSettings,
     async_surreal_client,
 )
 from langgraph_surrealdb.database.interface import SurrealAsyncConnection
@@ -59,14 +59,14 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
     @classmethod
     @asynccontextmanager
     async def from_env(cls) -> AsyncIterator[AsyncSurrealSaver]:
-        settings = SurrealConnSettings.from_env()
+        settings = SurrealSaverSettings.from_env()
         async with cls.from_settings(settings) as saver:
             yield saver
 
     @classmethod
     @asynccontextmanager
     async def from_settings(
-        cls, settings: SurrealConnSettings
+        cls, settings: SurrealSaverSettings
     ) -> AsyncIterator[AsyncSurrealSaver]:
         async with async_surreal_client(settings) as conn:
             yield cls(conn)

@@ -23,7 +23,7 @@ from langgraph_surrealdb.checkpoint.config import (
     PartialCheckpointConfig,
 )
 from langgraph_surrealdb.database.common import (
-    SurrealConnSettings,
+    SurrealSaverSettings,
     surreal_client,
 )
 from langgraph_surrealdb.database.interface import SurrealConnection
@@ -65,13 +65,13 @@ class SurrealSaver(BaseCheckpointSaver[str]):
     @classmethod
     @contextmanager
     def from_env(cls) -> Iterator[SurrealSaver]:
-        settings = SurrealConnSettings.from_env()
+        settings = SurrealSaverSettings.from_env()
         with cls.from_settings(settings) as saver:
             yield saver
 
     @classmethod
     @contextmanager
-    def from_settings(cls, settings: SurrealConnSettings) -> Iterator[SurrealSaver]:
+    def from_settings(cls, settings: SurrealSaverSettings) -> Iterator[SurrealSaver]:
         with surreal_client(settings) as conn:
             yield cls(conn)
 

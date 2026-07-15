@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager, contextmanager
-from dataclasses import dataclass
 
 from surrealdb import AsyncSurreal, Surreal
 from surrealdb.types import Value
@@ -12,63 +10,74 @@ from langgraph_surrealdb.database.interface import (
     SurrealAsyncConnection,
     SurrealConnection,
 )
-
-
-@dataclass(frozen=True)
-class SurrealConnSettings:
-    url: str
-    namespace: str
-    database: str
-    username: str | None
-    password: str | None
-    token: str | None
-
-    @classmethod
-    def from_env(cls) -> SurrealConnSettings:
-        return cls(
-            url=os.getenv("SURREAL_URL") or "",
-            namespace=os.getenv("SURREAL_NS") or "",
-            database=os.getenv("SURREAL_DB") or "",
-            username=os.getenv("SURREAL_USER") or None,
-            password=os.getenv("SURREAL_PASS") or None,
-            token=os.getenv("SURREAL_TOKEN") or None,
-        )
-
-
-def _auth_payload(settings: SurrealConnSettings) -> dict[str, Value] | None:
-    if settings.token:
-        return None
-    if settings.username and settings.password:
-        return {"username": settings.username, "password": settings.password}
-    return None
+from langgraph_surrealdb.database.settings import (
+    RecordAuth,
+    RootAuth,
+    SurrealSaverSettings,
+    TokenAuth,
+)
 
 
 @contextmanager
 def surreal_client(
-    settings: SurrealConnSettings,
+    settings: SurrealSaverSettings,
 ) -> Generator[SurrealConnection, None, None]:
-    with Surreal(settings.url) as db:
-        auth = _auth_payload(settings)
-        if auth:
-            db.signin(auth)
-        elif settings.token:
-            db.authenticate(settings.token)
-        db.use(settings.namespace, settings.database)
-        yield db
+    with Surreal(settings.db.url) as db:
+        match settings.db.auth:
+            case TokenAuth():
+                db.authenticate(settings.db.auth.token)
+            case RecordAuth():
+                db.signin(
+                    {
+                        "database": settings.db.database,
+                        "namespace": settings.db.namespace,
+                        "variables": {
+                            "username": settings.db.auth.username,
+                            "password": settings.db.auth.password,
+                        },
+                        "access": settings.db.auth.access,
+                    }
+                )
+            case RootAuth():
+                db.signin(
+                    {
+                        "username": settings.db.auth.username,
+                        "password": settings.db.auth.password,
+                    }
+                )
+        db.use(settings.db.namespace, settings.db.database)
+        yield SurrealConnection(db)
 
 
 @asynccontextmanager
 async def async_surreal_client(
-    settings: SurrealConnSettings,
+    settings: SurrealSaverSettings,
 ) -> AsyncGenerator[SurrealAsyncConnection, None]:
-    async with AsyncSurreal(settings.url) as db:
-        auth = _auth_payload(settings)
-        if auth:
-            await db.signin(auth)
-        elif settings.token:
-            await db.authenticate(settings.token)
-        await db.use(settings.namespace, settings.database)
-        yield db
+    async with AsyncSurreal(settings.db.url) as db:
+        match settings.db.auth:
+            case TokenAuth():
+                await db.authenticate(settings.db.auth.token)
+            case RecordAuth():
+                await db.signin(
+                    {
+                        "database": settings.db.database,
+                        "namespace": settings.db.namespace,
+                        "variables": {
+                            "username": settings.db.auth.username,
+                            "password": settings.db.auth.password,
+                        },
+                        "access": settings.db.auth.access,
+                    }
+                )
+            case RootAuth():
+                await db.signin(
+                    {
+                        "username": settings.db.auth.username,
+                        "password": settings.db.auth.password,
+                    }
+                )
+        await db.use(settings.db.namespace, settings.db.database)
+        yield SurrealAsyncConnection(db)
 
 
 def select_one_result(result: Value) -> dict[str, Value]:

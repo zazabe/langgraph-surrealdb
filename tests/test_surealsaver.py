@@ -14,45 +14,16 @@ from langgraph.checkpoint.base import (
     empty_checkpoint,
 )
 
+from langgraph_surrealdb import SurrealSaverSettings
 from langgraph_surrealdb.checkpoint import SurrealSaver
 from langgraph_surrealdb.database.repository.checkpoints import _search_where
 
 
-def test_dump():
-
-    from langgraph.checkpoint.base import CheckpointMetadata
-
-    from langgraph_surrealdb.database.models.checkpoint import (
-        DbCheckpoint,
-        DbCheckpointId,
-    )
-
-    metadata = CheckpointMetadata(
-        source="input",
-        step=0,
-        parents={},
-        run_id="",
-        counters_since_delta_snapshot={},
-        score=None,
-    )
-    a = DbCheckpoint(
-        id=DbCheckpointId("checkpoints:abc"),
-        thread_id="",
-        checkpoint=b"",
-        checkpoint_id="",
-        checkpoint_ns="",
-        metadata=metadata,
-        parent_checkpoint_id="",
-        type="",
-    )
-
-    print(a.model_dump())
-
-
 class TestSurrealSaver:
     @pytest.fixture(autouse=True)
-    def setup(self, settings) -> None:
+    def setup(self, settings: SurrealSaverSettings) -> None:
         self.settings = settings
+
         # objects for test setup
         self.config_1: RunnableConfig = {
             "configurable": {
@@ -81,18 +52,24 @@ class TestSurrealSaver:
         self.chkpnt_2: Checkpoint = create_checkpoint(self.chkpnt_1, {}, 1)
         self.chkpnt_3: Checkpoint = empty_checkpoint()
 
-        self.metadata_1: CheckpointMetadata = {
-            "source": "input",
-            "step": 2,
-            "writes": {},
-            "score": 1,
-        }
-        self.metadata_2: CheckpointMetadata = {
-            "source": "loop",
-            "step": 1,
-            "writes": {"foo": "bar"},
-        }
-        self.metadata_3: CheckpointMetadata = {}
+        self.metadata_1 = cast(
+            CheckpointMetadata,
+            {
+                "source": "input",
+                "step": 2,
+                "writes": {},
+                "score": 1,
+            },
+        )
+        self.metadata_2 = cast(
+            CheckpointMetadata,
+            {
+                "source": "loop",
+                "step": 1,
+                "writes": {"foo": "bar"},
+            },
+        )
+        self.metadata_3 = cast(CheckpointMetadata, {})
 
     def test_combined_metadata(self) -> None:
         with SurrealSaver.from_settings(self.settings) as saver:
@@ -149,21 +126,31 @@ class TestSurrealSaver:
             )
             assert len(search_results_5) == 2
             assert {
-                search_results_5[0].config["configurable"]["checkpoint_ns"],
-                search_results_5[1].config["configurable"]["checkpoint_ns"],
+                search_results_5[0]
+                .config.get("configurable", {})
+                .get("checkpoint_ns", ""),
+                search_results_5[1]
+                .config.get("configurable", {})
+                .get("checkpoint_ns", ""),
             } == {"", "inner"}
 
             # search with before param
             search_results_6 = list(saver.list(None, before=search_results_5[1].config))
             assert len(search_results_6) == 1
-            assert search_results_6[0].config["configurable"]["thread_id"] == "thread-1"
+            assert (
+                search_results_6[0].config.get("configurable", {}).get("thread_id", "")
+                == "thread-1"
+            )
 
             # search with limit param
             search_results_7 = list(
                 saver.list({"configurable": {"thread_id": "thread-2"}}, limit=1)
             )
             assert len(search_results_7) == 1
-            assert search_results_7[0].config["configurable"]["thread_id"] == "thread-2"
+            assert (
+                search_results_7[0].config.get("configurable", {}).get("thread_id", "")
+                == "thread-2"
+            )
 
     def test_search_where(self) -> None:
         # call method / assertions
@@ -211,15 +198,21 @@ class TestSurrealSaver:
             checkpoint_public = empty_checkpoint()
             checkpoint_private = empty_checkpoint()
 
-            metadata_public: CheckpointMetadata = {
-                "access": "public",
-                "data": "public information",
-            }
-            metadata_private: CheckpointMetadata = {
-                "access": "private",
-                "data": "secret information",
-                "password": "secret123",
-            }
+            metadata_public = cast(
+                CheckpointMetadata,
+                {
+                    "access": "public",
+                    "data": "public information",
+                },
+            )
+            metadata_private = cast(
+                CheckpointMetadata,
+                {
+                    "access": "private",
+                    "data": "secret information",
+                    "password": "secret123",
+                },
+            )
 
             saver.put(config_public, checkpoint_public, metadata_public, {})
             saver.put(config_private, checkpoint_private, metadata_private, {})
@@ -227,7 +220,7 @@ class TestSurrealSaver:
             # Normal query - should return only public checkpoint
             normal_results = list(saver.list(None, filter={"access": "public"}))
             assert len(normal_results) == 1
-            assert normal_results[0].metadata["access"] == "public"
+            assert normal_results[0].metadata.get("access", "") == "public"
 
             # SQL injection attempt should raise ValueError
             malicious_key = (
@@ -249,7 +242,12 @@ class TestSurrealSaver:
                     }
                 }
                 checkpoint = empty_checkpoint()
-                metadata: CheckpointMetadata = {"index": i}
+                metadata = cast(
+                    CheckpointMetadata,
+                    {
+                        "index": i,
+                    },
+                )
                 saver.put(config, checkpoint, metadata, {})
 
             # Test that limit works correctly with valid integer
@@ -278,11 +276,14 @@ class TestSurrealSaver:
                 }
             }
             checkpoint = empty_checkpoint()
-            metadata: CheckpointMetadata = {
-                "access-level": "public",
-                "user": {"access-level": "nested", "123abc": "ok2"},
-                "123abc": "ok",
-            }
+            metadata = cast(
+                CheckpointMetadata,
+                {
+                    "access-level": "public",
+                    "user": {"access-level": "nested", "123abc": "ok2"},
+                    "123abc": "ok",
+                },
+            )
             saver.put(config, checkpoint, metadata, {})
 
             # Top-level hyphenated key

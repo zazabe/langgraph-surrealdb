@@ -1,5 +1,5 @@
 {
-  "name": "langgraph-checkpoint-surreal",
+  "name": "langgraph-surrealdb",
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "workspaceFolder": "/workspaces/checkpoint",

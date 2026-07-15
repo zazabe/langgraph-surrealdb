@@ -1,9 +1,8 @@
-from typing import Any
+from typing import Any, Self
 
 from langgraph.checkpoint.base import PendingWrite
 from langgraph.checkpoint.serde.base import SerializerProtocol
 from pydantic import BaseModel, ConfigDict, Field
-from typing_extensions import Self
 
 from langgraph_surrealdb.database.models import DbRecordId
 
