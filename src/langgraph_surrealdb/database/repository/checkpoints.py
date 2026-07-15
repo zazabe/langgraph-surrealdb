@@ -55,7 +55,8 @@ class DbCheckpointsRepository:
         if not first or first.status == "ERR":
             error = first.result if first else "Unknown error"
             raise RuntimeError(
-                f"Failed to probe checkpoints table. Call setup() first, error: {error}")
+                f"Failed to probe checkpoints table. Call setup() first, error: {error}"
+            )
 
     def upsert(self, checkpoint: DbCheckpoint) -> None:
         self._conn.upsert(checkpoint.id, checkpoint.model_dump())
@@ -117,7 +118,8 @@ class DbAsyncCheckpointsRepository:
         if not first or first.status == "ERR":
             error = first.result if first else "Unknown error"
             raise RuntimeError(
-                f"Failed to probe checkpoints table. Call setup() first, error: {error}")
+                f"Failed to probe checkpoints table. Call setup() first, error: {error}"
+            )
 
     async def upsert(self, checkpoint: DbCheckpoint) -> None:
         id = checkpoint.id.to_record_id()

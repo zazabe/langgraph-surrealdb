@@ -54,7 +54,8 @@ class DbWritesRepository:
         if not first or first.status == "ERR":
             error = first.result if first else "Unknown error"
             raise RuntimeError(
-                f"Failed to probe writes table. Call setup() first, error: {error}")
+                f"Failed to probe writes table. Call setup() first, error: {error}"
+            )
 
     def create(self, write: DbWrite) -> None:
         self._conn.create(write.id, write.model_dump())
@@ -103,7 +104,8 @@ class DbAsyncWritesRepository:
         if not first or first.status == "ERR":
             error = first.result if first else "Unknown error"
             raise RuntimeError(
-                f"Failed to probe writes table. Call setup() first, error: {error}")
+                f"Failed to probe writes table. Call setup() first, error: {error}"
+            )
 
     async def create(self, write: DbWrite) -> None:
         await self._conn.create(write.id, write.model_dump())
