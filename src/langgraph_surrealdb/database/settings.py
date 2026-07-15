@@ -1,9 +1,7 @@
-from abc import ABC, abstractmethod
 from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from surrealdb.types import Value
 
 NonEmpty = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
@@ -44,40 +42,22 @@ class SurrealEnvSettings(BaseSettings):
         return self
 
 
-class BaseAuth(BaseModel, ABC):
-    @abstractmethod
-    def payload(self) -> dict[str, Value]: ...
-
-
-class RootAuth(BaseAuth):
+class RootAuth(BaseModel):
     mode: Literal["root"] = "root"
     username: NonEmpty
     password: NonEmpty
 
-    def payload(self) -> dict[str, Value]:
-        return {"username": self.username, "password": self.password}
 
-
-class RecordAuth(BaseAuth):
+class RecordAuth(BaseModel):
     mode: Literal["record"] = "record"
     username: NonEmpty
     password: NonEmpty
     access: NonEmpty
 
-    def payload(self) -> dict[str, Value]:
-        return {
-            "username": self.username,
-            "password": self.password,
-            "access": self.access,
-        }
 
-
-class TokenAuth(BaseAuth):
+class TokenAuth(BaseModel):
     mode: Literal["token"] = "token"
     token: NonEmpty
-
-    def payload(self) -> dict[str, Value]:
-        return {"token": self.token}
 
 
 DatabaseAuth = Annotated[RootAuth | RecordAuth | TokenAuth, Field(discriminator="mode")]

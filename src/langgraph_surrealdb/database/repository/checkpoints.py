@@ -13,7 +13,7 @@ from langgraph_surrealdb.database.models.checkpoint import (
 )
 
 SETUP_QUERY = """
-DEFINE TABLE IF NOT EXISTS checkpoints SCHEMALESS;
+DEFINE TABLE IF NOT EXISTS checkpoints SCHEMALESS PERMISSIONS FULL;
 DEFINE FIELD IF NOT EXISTS thread_id ON checkpoints TYPE string;
 DEFINE FIELD IF NOT EXISTS checkpoint_ns ON checkpoints TYPE string;
 DEFINE FIELD IF NOT EXISTS checkpoint_id ON checkpoints TYPE string;

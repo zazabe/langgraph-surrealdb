@@ -7,7 +7,7 @@ from langgraph_surrealdb.database.interface import QueryRawResult
 from langgraph_surrealdb.database.models.write import DbWrite, DbWriteId
 
 SETUP_QUERY = """
-DEFINE TABLE IF NOT EXISTS writes SCHEMALESS;
+DEFINE TABLE IF NOT EXISTS writes SCHEMALESS PERMISSIONS FULL;
 DEFINE FIELD IF NOT EXISTS thread_id ON writes TYPE string;
 DEFINE FIELD IF NOT EXISTS checkpoint_ns ON writes TYPE string;
 DEFINE FIELD IF NOT EXISTS checkpoint_id ON writes TYPE string;
