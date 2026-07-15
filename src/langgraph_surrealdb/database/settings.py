@@ -4,12 +4,13 @@ from typing import Annotated, Literal, Self
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-NonEmpty = Annotated[str, StringConstraints(
-    strip_whitespace=True, min_length=1)]
+NonEmpty = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 def _validate_table_name(table_name: str) -> bool:
-    return bool(re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", table_name) and len(table_name) <= 64)
+    return bool(
+        re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", table_name) and len(table_name) <= 64
+    )
 
 
 class SurrealEnvSettings(BaseSettings):
@@ -33,11 +34,9 @@ class SurrealEnvSettings(BaseSettings):
     def validate_auth(self) -> Self:
         if self.auth_mode == "root":
             if not (self.user and self.password):
-                raise ValueError(
-                    "root mode requires SURREAL_USER and SURREAL_PASSWORD")
+                raise ValueError("root mode requires SURREAL_USER and SURREAL_PASSWORD")
             if self.token or self.access:
-                raise ValueError(
-                    "root mode forbids SURREAL_TOKEN and SURREAL_ACCESS")
+                raise ValueError("root mode forbids SURREAL_TOKEN and SURREAL_ACCESS")
         elif self.auth_mode == "record":
             if not (self.user and self.password and self.access):
                 raise ValueError("record mode requires USER/PASSWORD/ACCESS")
@@ -69,8 +68,7 @@ class TokenAuth(BaseModel):
     token: NonEmpty
 
 
-DatabaseAuth = Annotated[RootAuth | RecordAuth |
-                         TokenAuth, Field(discriminator="mode")]
+DatabaseAuth = Annotated[RootAuth | RecordAuth | TokenAuth, Field(discriminator="mode")]
 
 
 class SurrealSaverDatabaseSettings(BaseModel):
@@ -96,8 +94,7 @@ class SurrealSaverSettings(BaseModel):
                 auth = RootAuth(username=cfg.user, password=cfg.password)
             case "record":
                 if not (cfg.user and cfg.password and cfg.access):
-                    raise ValueError(
-                        "record mode requires user/password/access")
+                    raise ValueError("record mode requires user/password/access")
                 auth = RecordAuth(
                     username=cfg.user, password=cfg.password, access=cfg.access
                 )
@@ -126,11 +123,14 @@ class SurrealSaverSettings(BaseModel):
     def validate_table_names(self) -> Self:
         if self.checkpoints_table == self.writes_table:
             raise ValueError(
-                f"checkpoints_table ({self.checkpoints_table}) and writes_table ({self.writes_table}) cannot be the same")
+                f"checkpoints_table ({self.checkpoints_table}) and writes_table ({self.writes_table}) cannot be the same"
+            )
         if not _validate_table_name(self.checkpoints_table):
             raise ValueError(
-                f"checkpoints_table ({self.checkpoints_table}) is not a valid table name")
+                f"checkpoints_table ({self.checkpoints_table}) is not a valid table name"
+            )
         if not _validate_table_name(self.writes_table):
             raise ValueError(
-                f"writes_table ({self.writes_table}) is not a valid table name")
+                f"writes_table ({self.writes_table}) is not a valid table name"
+            )
         return self

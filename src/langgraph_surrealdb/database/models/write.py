@@ -42,8 +42,7 @@ class DbWriteId(DbRecordId):
     ) -> CoreSchema:
         return core_schema.with_info_before_validator_function(
             cls._coerce_with_info,
-            core_schema.no_info_after_validator_function(
-                cls, core_schema.str_schema()),
+            core_schema.no_info_after_validator_function(cls, core_schema.str_schema()),
         )
 
 
