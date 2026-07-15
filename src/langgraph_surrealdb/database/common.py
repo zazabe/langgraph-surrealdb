@@ -1,100 +1,16 @@
 from __future__ import annotations
 
-import os
-from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager, contextmanager
-from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, StringConstraints
 from surrealdb import AsyncSurreal, Surreal
 from surrealdb.types import Value
 
 from langgraph_surrealdb.database.interface import (
-    QueryRawResult,
     SurrealAsyncConnection,
     SurrealConnection,
 )
-
-NonEmpty = Annotated[str, StringConstraints(
-    strip_whitespace=True, min_length=1)]
-
-
-class BaseAuth(BaseModel, ABC):
-    @abstractmethod
-    def payload(self) -> dict[str, Value]: ...
-
-
-class RootAuth(BaseAuth):
-    mode: Literal["root"] = "root"
-    username: NonEmpty
-    password: NonEmpty
-
-    def payload(self) -> dict[str, Value]:
-        return {"username": self.username, "password": self.password}
-
-
-class RecordAuth(BaseAuth):
-    mode: Literal["record"] = "record"
-    username: NonEmpty
-    password: NonEmpty
-    access: NonEmpty
-
-    def payload(self) -> dict[str, Value]:
-        return {
-            "username": self.username,
-            "password": self.password,
-            "access": self.access,
-        }
-
-
-class TokenAuth(BaseAuth):
-    mode: Literal["token"] = "token"
-    token: NonEmpty
-
-    def payload(self) -> dict[str, Value]:
-        return {"token": self.token}
-
-
-DatabaseAuth = Annotated[RootAuth | RecordAuth |
-                         TokenAuth, Field(discriminator="mode")]
-
-
-class SurrealSaverDatabaseSettings(BaseModel):
-    url: NonEmpty
-    namespace: NonEmpty
-    database: NonEmpty
-    auth: DatabaseAuth
-
-
-class SurrealSaverSettings(BaseModel):
-    db: SurrealSaverDatabaseSettings
-
-    @classmethod
-    def from_env(cls) -> SurrealSaverSettings:
-        username = os.getenv("SURREAL_USER") or ""
-        password = os.getenv("SURREAL_PASS") or ""
-        access = os.getenv("SURREAL_ACCESS") or ""
-        token = os.getenv("SURREAL_TOKEN") or ""
-
-        if username and password and access:
-            auth = RecordAuth(username=username,
-                              password=password, access=access)
-        elif username and password:
-            auth = RootAuth(username=username, password=password)
-        elif token:
-            auth = TokenAuth(token=token)
-        else:
-            raise ValueError("No authentication provided")
-
-        return cls(
-            db=SurrealSaverDatabaseSettings(
-                url=os.getenv("SURREAL_URL") or "",
-                namespace=os.getenv("SURREAL_NS") or "",
-                database=os.getenv("SURREAL_DB") or "",
-                auth=auth,
-            )
-        )
+from langgraph_surrealdb.database.settings import SurrealSaverSettings
 
 
 @contextmanager

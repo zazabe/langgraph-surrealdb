@@ -10,16 +10,28 @@ pip install langgraph-surrealdb
 
 ## Configure SurrealDB
 
-Set these environment variables:
+Set these environment variables (prefix: `LANGGRAPH_SURREALDB_`):
 
 ```bash
-export SURREAL_URL="ws://localhost:8000/rpc"
-export SURREAL_NS="langgraph"
-export SURREAL_DB="checkpoint"
-export SURREAL_USER="root"
-export SURREAL_PASS="root"
-export SURREAL_ACCESS="method" # for user-record auth
-export SURREAL_TOKEN="xyz" # for token based auth
+# required for all modes
+export LANGGRAPH_SURREALDB_URL="ws://localhost:8000/rpc"
+export LANGGRAPH_SURREALDB_NS="langgraph"
+export LANGGRAPH_SURREALDB_DB="checkpoint"
+
+# root mode
+export LANGGRAPH_SURREALDB_AUTH_MODE="root"
+export LANGGRAPH_SURREALDB_USER="root"
+export LANGGRAPH_SURREALDB_PASSWORD="pass"
+
+# record mode
+# export LANGGRAPH_SURREALDB_AUTH_MODE="record"
+# export LANGGRAPH_SURREALDB_USER="user"
+# export LANGGRAPH_SURREALDB_PASSWORD="pass"
+# export LANGGRAPH_SURREALDB_ACCESS="method"
+
+# token mode
+# export LANGGRAPH_SURREALDB_AUTH_MODE="token"
+# export LANGGRAPH_SURREALDB_TOKEN="xyz"
 ```
 
 Or create the saver directly from settings:

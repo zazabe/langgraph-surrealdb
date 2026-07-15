@@ -1,3 +1,5 @@
+from typing import Self
+
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import (
     Checkpoint,
@@ -6,7 +8,6 @@ from langgraph.checkpoint.base import (
 )
 from langgraph.checkpoint.serde.base import SerializerProtocol
 from pydantic import BaseModel, ConfigDict, Field
-from typing_extensions import Self
 
 from langgraph_surrealdb.checkpoint.config import FullCheckpointConfig
 from langgraph_surrealdb.database.models import DbRecordId

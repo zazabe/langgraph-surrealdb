@@ -52,8 +52,7 @@ class DbCheckpointsRepository:
     def probe(self) -> None:
         raw: QueryRawResult[dict[str, int]] = self._conn.query_raw(PROBE_QUERY)
         if not raw.first_success():
-            raise RuntimeError(
-                "Failed to probe checkpoints table. Call setup() first.")
+            raise RuntimeError("Failed to probe checkpoints table. Call setup() first.")
 
     def upsert(self, checkpoint: DbCheckpoint) -> None:
         self._conn.upsert(checkpoint.id, checkpoint.model_dump())
@@ -112,8 +111,7 @@ class DbAsyncCheckpointsRepository:
     async def probe(self) -> None:
         raw: QueryRawResult[dict[str, int]] = await self._conn.query_raw(PROBE_QUERY)
         if not raw.first_success():
-            raise RuntimeError(
-                "Failed to probe writes table. Call setup() first.")
+            raise RuntimeError("Failed to probe writes table. Call setup() first.")
 
     async def upsert(self, checkpoint: DbCheckpoint) -> None:
         id = checkpoint.id.to_record_id()
