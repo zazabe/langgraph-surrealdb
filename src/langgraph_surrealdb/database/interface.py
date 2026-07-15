@@ -8,7 +8,8 @@ from surrealdb.types import Value
 
 class QueryRawItemResult[T: Any](BaseModel):
     result: T
-    status: Literal["OK", "ERROR"]
+    status: Literal["OK", "ERR"]
+    kind: str | None = None
 
 
 class QueryRawResult[T: Any](BaseModel):
@@ -18,13 +19,10 @@ class QueryRawResult[T: Any](BaseModel):
     def len(self) -> int:
         return len(self.result)
 
-    def first_success(self) -> QueryRawItemResult[T] | None:
+    def first(self) -> QueryRawItemResult[T] | None:
         if self.len() == 0:
             return None
-        for item in self.result:
-            if item.status == "OK":
-                return item
-        return None
+        return self.result[0]
 
 
 class SurrealConnectionProtocol(Protocol):

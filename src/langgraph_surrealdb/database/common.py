@@ -45,7 +45,7 @@ def surreal_client(
                         "password": settings.db.auth.password,
                     }
                 )
-                db.use(settings.db.namespace, settings.db.database)
+        db.use(settings.db.namespace, settings.db.database)
         yield SurrealConnection(db)
 
 
@@ -76,7 +76,7 @@ async def async_surreal_client(
                         "password": settings.db.auth.password,
                     }
                 )
-                await db.use(settings.db.namespace, settings.db.database)
+        await db.use(settings.db.namespace, settings.db.database)
         yield SurrealAsyncConnection(db)
 
 

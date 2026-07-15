@@ -50,8 +50,11 @@ class DbWritesRepository:
 
     def probe(self) -> None:
         raw: QueryRawResult[dict[str, int]] = self._conn.query_raw(PROBE_QUERY)
-        if not raw.first_success():
-            raise RuntimeError("Failed to probe writes table. Call setup() first.")
+        first = raw.first()
+        if not first or first.status == "ERR":
+            error = first.result if first else "Unknown error"
+            raise RuntimeError(
+                f"Failed to probe writes table. Call setup() first, error: {error}")
 
     def create(self, write: DbWrite) -> None:
         self._conn.create(write.id, write.model_dump())
@@ -96,8 +99,11 @@ class DbAsyncWritesRepository:
 
     async def probe(self) -> None:
         raw: QueryRawResult[dict[str, int]] = await self._conn.query_raw(PROBE_QUERY)
-        if not raw.first_success():
-            raise RuntimeError("Failed to probe writes table. Call setup() first.")
+        first = raw.first()
+        if not first or first.status == "ERR":
+            error = first.result if first else "Unknown error"
+            raise RuntimeError(
+                f"Failed to probe writes table. Call setup() first, error: {error}")
 
     async def create(self, write: DbWrite) -> None:
         await self._conn.create(write.id, write.model_dump())
