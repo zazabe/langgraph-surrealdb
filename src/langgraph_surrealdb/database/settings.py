@@ -1,9 +1,16 @@
+import re
 from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 NonEmpty = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+def _validate_table_name(table_name: str) -> bool:
+    return bool(
+        re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", table_name) and len(table_name) <= 64
+    )
 
 
 class SurrealEnvSettings(BaseSettings):
@@ -15,6 +22,7 @@ class SurrealEnvSettings(BaseSettings):
     url: NonEmpty
     ns: NonEmpty
     db: NonEmpty
+    table_prefix: str | None = None
 
     auth_mode: Literal["root", "record", "token"]
     user: str | None = None
@@ -71,6 +79,8 @@ class SurrealSaverDatabaseSettings(BaseModel):
 
 
 class SurrealSaverSettings(BaseModel):
+    checkpoints_table: str = "checkpoints"
+    writes_table: str = "writes"
     db: SurrealSaverDatabaseSettings
 
     @classmethod
@@ -93,11 +103,34 @@ class SurrealSaverSettings(BaseModel):
                     raise ValueError("token mode requires token")
                 auth = TokenAuth(token=cfg.token)
 
+        checkpoints_table = (
+            cfg.table_prefix + "_checkpoints" if cfg.table_prefix else "checkpoints"
+        )
+        writes_table = cfg.table_prefix + "_writes" if cfg.table_prefix else "writes"
+
         return cls(
+            checkpoints_table=checkpoints_table,
+            writes_table=writes_table,
             db=SurrealSaverDatabaseSettings(
                 url=cfg.url,
                 namespace=cfg.ns,
                 database=cfg.db,
                 auth=auth,
-            )
+            ),
         )
+
+    @model_validator(mode="after")
+    def validate_table_names(self) -> Self:
+        if self.checkpoints_table == self.writes_table:
+            raise ValueError(
+                f"checkpoints_table ({self.checkpoints_table}) and writes_table ({self.writes_table}) cannot be the same"
+            )
+        if not _validate_table_name(self.checkpoints_table):
+            raise ValueError(
+                f"checkpoints_table ({self.checkpoints_table}) is not a valid table name"
+            )
+        if not _validate_table_name(self.writes_table):
+            raise ValueError(
+                f"writes_table ({self.writes_table}) is not a valid table name"
+            )
+        return self

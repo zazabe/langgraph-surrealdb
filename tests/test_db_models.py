@@ -27,6 +27,7 @@ def test_db_checkpoint_create_without_parent_checkpoint_id() -> None:
     }
 
     db_checkpoint = DbCheckpoint.create(
+        table="checkpoints",
         serde=serde,
         config=config,
         checkpoint=empty_checkpoint(),
@@ -48,6 +49,7 @@ def test_db_checkpoint_create_with_parent_checkpoint_id() -> None:
     }
 
     db_checkpoint = DbCheckpoint.create(
+        table="checkpoints",
         serde=serde,
         config=config,
         checkpoint=empty_checkpoint(),
@@ -67,6 +69,7 @@ def test_db_checkpoint_create_with_parent_checkpoint_id() -> None:
 def test_db_write_create_and_pending_write_round_trip() -> None:
     serde = JsonPlusSerializer()
     write = DbWrite.create(
+        table="writes",
         serde=serde,
         thread_id="thread-1",
         checkpoint_ns="ns-1",

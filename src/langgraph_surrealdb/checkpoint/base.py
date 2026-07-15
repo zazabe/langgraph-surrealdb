@@ -29,9 +29,9 @@ from langgraph_surrealdb.database.common import (
 from langgraph_surrealdb.database.interface import SurrealConnection
 from langgraph_surrealdb.database.models.checkpoint import (
     DbCheckpoint,
-    DbCheckpointId,
+    DbCheckpointsModelFactory,
 )
-from langgraph_surrealdb.database.models.write import DbWrite
+from langgraph_surrealdb.database.models.write import DbWritesModelFactory
 from langgraph_surrealdb.database.repository.checkpoints import (
     DbCheckpointsRepository,
 )
@@ -54,11 +54,17 @@ class SurrealSaver(BaseCheckpointSaver[str]):
         self,
         conn: SurrealConnection,
         *,
+        checkpoints_table: str = "checkpoints",
+        writes_table: str = "writes",
         serde: SerializerProtocol | None = None,
     ) -> None:
         super().__init__(serde=serde)
-        self.repo_checkpoints = DbCheckpointsRepository(conn)
-        self.repo_writes = DbWritesRepository(conn)
+        checkpoints_model_factory = DbCheckpointsModelFactory(table=checkpoints_table)
+        writes_model_factory = DbWritesModelFactory(table=writes_table)
+        self.repo_checkpoints = DbCheckpointsRepository(conn, checkpoints_model_factory)
+        self.repo_writes = DbWritesRepository(conn, writes_model_factory)
+        self.checkpoints_model_factory = checkpoints_model_factory
+        self.writes_model_factory = writes_model_factory
         self.is_setup = False
         self.lock = threading.Lock()
 
@@ -73,7 +79,11 @@ class SurrealSaver(BaseCheckpointSaver[str]):
     @contextmanager
     def from_settings(cls, settings: SurrealSaverSettings) -> Iterator[SurrealSaver]:
         with surreal_client(settings) as conn:
-            yield cls(conn)
+            yield cls(
+                conn,
+                checkpoints_table=settings.checkpoints_table,
+                writes_table=settings.writes_table,
+            )
 
     def setup(self) -> None:
         with self.lock:
@@ -110,8 +120,10 @@ class SurrealSaver(BaseCheckpointSaver[str]):
         self._ensure_ready()
         with self.lock:
             if checkpoint_id:
-                db_checkpoint_id = DbCheckpointId.from_ids(
-                    thread_id, checkpoint_ns, checkpoint_id
+                db_checkpoint_id = self.checkpoints_model_factory.create_id(
+                    thread_id=thread_id,
+                    checkpoint_ns=checkpoint_ns,
+                    checkpoint_id=checkpoint_id,
                 )
                 checkpoint = self.repo_checkpoints.get_by_id(db_checkpoint_id)
             else:
@@ -156,7 +168,12 @@ class SurrealSaver(BaseCheckpointSaver[str]):
         metadata: CheckpointMetadata,
         new_versions: ChannelVersions,
     ) -> RunnableConfig:
-        db_checkpoint = DbCheckpoint.create(self.serde, config, checkpoint, metadata)
+        db_checkpoint = self.checkpoints_model_factory.create_record(
+            serde=self.serde,
+            config=config,
+            checkpoint=checkpoint,
+            metadata=metadata,
+        )
         self._ensure_ready()
         with self.lock:
             self.repo_checkpoints.upsert(db_checkpoint)
@@ -179,15 +196,15 @@ class SurrealSaver(BaseCheckpointSaver[str]):
         with self.lock:
             for idx, (channel, value) in enumerate(writes):
                 use_idx = WRITES_IDX_MAP.get(channel, idx)
-                write = DbWrite.create(
-                    self.serde,
-                    thread_id,
-                    checkpoint_ns,
-                    checkpoint_id,
-                    task_id,
-                    use_idx,
-                    channel,
-                    value,
+                write = self.writes_model_factory.create_record(
+                    serde=self.serde,
+                    thread_id=thread_id,
+                    checkpoint_ns=checkpoint_ns,
+                    checkpoint_id=checkpoint_id,
+                    task_id=task_id,
+                    idx=use_idx,
+                    channel=channel,
+                    value=value,
                 )
 
                 if replace:

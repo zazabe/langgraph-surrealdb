@@ -17,7 +17,7 @@ Set these environment variables (prefix: `LANGGRAPH_SURREALDB_`):
 export LANGGRAPH_SURREALDB_URL="ws://localhost:8000/rpc"
 export LANGGRAPH_SURREALDB_NS="langgraph"
 export LANGGRAPH_SURREALDB_DB="checkpoint"
-
+export LANGGRAPH_SURREALDB_TABLE_PREFIX="prefix" # optionally add a prefix to checkpoint tables
 # root mode
 export LANGGRAPH_SURREALDB_AUTH_MODE="root"
 export LANGGRAPH_SURREALDB_USER="root"
@@ -46,6 +46,8 @@ from langgraph_surrealdb import (
 )
 
 settings = SurrealSaverSettings(
+    writes_table="writes", # optional, defaults to 'writes'
+    checkpoints_table="checkpoints", # optional, defaults to 'checkpoints'
     db=SurrealSaverDatabaseSettings(
         url="ws://localhost:8000/rpc",
         namespace="langgraph",
