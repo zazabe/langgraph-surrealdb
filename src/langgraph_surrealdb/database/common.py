@@ -11,11 +11,13 @@ from surrealdb import AsyncSurreal, Surreal
 from surrealdb.types import Value
 
 from langgraph_surrealdb.database.interface import (
+    QueryRawResult,
     SurrealAsyncConnection,
     SurrealConnection,
 )
 
-NonEmpty = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+NonEmpty = Annotated[str, StringConstraints(
+    strip_whitespace=True, min_length=1)]
 
 
 class BaseAuth(BaseModel, ABC):
@@ -54,7 +56,8 @@ class TokenAuth(BaseAuth):
         return {"token": self.token}
 
 
-DatabaseAuth = Annotated[RootAuth | RecordAuth | TokenAuth, Field(discriminator="mode")]
+DatabaseAuth = Annotated[RootAuth | RecordAuth |
+                         TokenAuth, Field(discriminator="mode")]
 
 
 class SurrealSaverDatabaseSettings(BaseModel):
@@ -75,7 +78,8 @@ class SurrealSaverSettings(BaseModel):
         token = os.getenv("SURREAL_TOKEN") or ""
 
         if username and password and access:
-            auth = RecordAuth(username=username, password=password, access=access)
+            auth = RecordAuth(username=username,
+                              password=password, access=access)
         elif username and password:
             auth = RootAuth(username=username, password=password)
         elif token:
@@ -103,7 +107,7 @@ def surreal_client(
         else:
             db.signin(settings.db.auth.payload())
         db.use(settings.db.namespace, settings.db.database)
-        yield db
+        yield SurrealConnection(db)
 
 
 @asynccontextmanager
@@ -116,7 +120,7 @@ async def async_surreal_client(
         else:
             await db.signin(settings.db.auth.payload())
         await db.use(settings.db.namespace, settings.db.database)
-        yield db
+        yield SurrealAsyncConnection(db)
 
 
 def select_one_result(result: Value) -> dict[str, Value]:
