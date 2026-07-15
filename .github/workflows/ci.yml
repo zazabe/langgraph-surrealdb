@@ -30,6 +30,7 @@ jobs:
     strategy:
       matrix:
         auth_mode: [root, record, token]
+        table_prefix: ["", "test"]
     env:
       SURREAL_URL: ws://127.0.0.1:8000
       SURREAL_NS: langgraph
@@ -81,6 +82,7 @@ jobs:
           LANGGRAPH_SURREALDB_AUTH_MODE: root
           LANGGRAPH_SURREALDB_USER: ${{ env.SURREAL_USER }}
           LANGGRAPH_SURREALDB_PASSWORD: ${{ env.SURREAL_PASS }}
+          LANGGRAPH_SURREALDB_TABLE_PREFIX: ${{ matrix.table_prefix }}
         run: uv run pytest -q
       - name: Run tests (record)
         if: matrix.auth_mode == 'record'
@@ -94,6 +96,7 @@ jobs:
           LANGGRAPH_SURREALDB_USER: pytest
           LANGGRAPH_SURREALDB_PASSWORD: pytest
           LANGGRAPH_SURREALDB_ACCESS: auth
+          LANGGRAPH_SURREALDB_TABLE_PREFIX: ${{ matrix.table_prefix }}
         run: uv run pytest -q
       - name: Run tests (token)
         if: matrix.auth_mode == 'token'
@@ -104,6 +107,7 @@ jobs:
           LANGGRAPH_SURREALDB_TEST_ROOT_PASSWORD: "${{ env.SURREAL_PASS }}"
           LANGGRAPH_SURREALDB_DB: ci_token
           LANGGRAPH_SURREALDB_AUTH_MODE: token
+          LANGGRAPH_SURREALDB_TABLE_PREFIX: ${{ matrix.table_prefix }}
         run: |
           TOKEN="$(curl -sS -X POST "http://127.0.0.1:8000/signin" \
                   -H "Content-Type: application/json" \

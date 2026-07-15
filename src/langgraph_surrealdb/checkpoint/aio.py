@@ -29,9 +29,9 @@ from langgraph_surrealdb.database.common import (
 from langgraph_surrealdb.database.interface import SurrealAsyncConnection
 from langgraph_surrealdb.database.models.checkpoint import (
     DbCheckpoint,
-    DbCheckpointId,
+    DbCheckpointsModelFactory,
 )
-from langgraph_surrealdb.database.models.write import DbWrite
+from langgraph_surrealdb.database.models.write import DbWritesModelFactory
 from langgraph_surrealdb.database.repository.checkpoints import (
     DbAsyncCheckpointsRepository,
 )
@@ -47,11 +47,19 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
         self,
         conn: SurrealAsyncConnection,
         *,
+        checkpoints_table: str = "checkpoints",
+        writes_table: str = "writes",
         serde: SerializerProtocol | None = None,
     ) -> None:
         super().__init__(serde=serde)
-        self.repo_checkpoints = DbAsyncCheckpointsRepository(conn)
-        self.repo_writes = DbAsyncWritesRepository(conn)
+        checkpoints_model_factory = DbCheckpointsModelFactory(table=checkpoints_table)
+        writes_model_factory = DbWritesModelFactory(table=writes_table)
+        self.repo_checkpoints = DbAsyncCheckpointsRepository(
+            conn, checkpoints_model_factory
+        )
+        self.repo_writes = DbAsyncWritesRepository(conn, writes_model_factory)
+        self.checkpoints_model_factory = checkpoints_model_factory
+        self.writes_model_factory = writes_model_factory
         self.lock = asyncio.Lock()
         self.loop = asyncio.get_running_loop()
         self.is_setup = False
@@ -69,7 +77,11 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
         cls, settings: SurrealSaverSettings
     ) -> AsyncIterator[AsyncSurrealSaver]:
         async with async_surreal_client(settings) as conn:
-            yield cls(conn)
+            yield cls(
+                conn,
+                checkpoints_table=settings.checkpoints_table,
+                writes_table=settings.writes_table,
+            )
 
     def get_tuple(self, config: RunnableConfig) -> CheckpointTuple | None:
         try:
@@ -177,8 +189,10 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
         thread_id = checkpoint_config.thread_id
         async with self.lock:
             if checkpoint_id:
-                db_checkpoint_id = DbCheckpointId.from_ids(
-                    thread_id, checkpoint_ns, checkpoint_id
+                db_checkpoint_id = self.checkpoints_model_factory.create_id(
+                    thread_id=thread_id,
+                    checkpoint_ns=checkpoint_ns,
+                    checkpoint_id=checkpoint_id,
                 )
                 checkpoint = await self.repo_checkpoints.get_by_id(db_checkpoint_id)
             else:
@@ -228,7 +242,12 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
     ) -> RunnableConfig:
         await self._ensure_ready()
 
-        db_checkpoint = DbCheckpoint.create(self.serde, config, checkpoint, metadata)
+        db_checkpoint = self.checkpoints_model_factory.create_record(
+            serde=self.serde,
+            config=config,
+            checkpoint=checkpoint,
+            metadata=metadata,
+        )
         async with self.lock:
             await self.repo_checkpoints.upsert(db_checkpoint)
         return db_checkpoint.to_config()
@@ -251,15 +270,15 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
         async with self.lock:
             for idx, (channel, value) in enumerate(writes):
                 use_idx = WRITES_IDX_MAP.get(channel, idx)
-                write = DbWrite.create(
-                    self.serde,
-                    thread_id,
-                    checkpoint_ns,
-                    checkpoint_id,
-                    task_id,
-                    use_idx,
-                    channel,
-                    value,
+                write = self.writes_model_factory.create_record(
+                    serde=self.serde,
+                    thread_id=thread_id,
+                    checkpoint_ns=checkpoint_ns,
+                    checkpoint_id=checkpoint_id,
+                    task_id=task_id,
+                    idx=use_idx,
+                    channel=channel,
+                    value=value,
                 )
 
                 if replace:

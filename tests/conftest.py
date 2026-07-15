@@ -82,6 +82,8 @@ async def root_settings(
     db_module_name: str,
 ) -> SurrealSaverSettings:
     return SurrealSaverSettings(
+        checkpoints_table=test_settings.user_settings.checkpoints_table,
+        writes_table=test_settings.user_settings.writes_table,
         db=SurrealSaverDatabaseSettings(
             url=test_settings.user_settings.db.url,
             namespace=test_settings.user_settings.db.namespace,
@@ -101,6 +103,8 @@ async def settings(
     db_module_name: str,
 ) -> AsyncGenerator[SurrealSaverSettings, None]:
     user_settings = SurrealSaverSettings(
+        checkpoints_table=test_settings.user_settings.checkpoints_table,
+        writes_table=test_settings.user_settings.writes_table,
         db=SurrealSaverDatabaseSettings(
             url=test_settings.user_settings.db.url,
             namespace=test_settings.user_settings.db.namespace,
@@ -167,8 +171,8 @@ async def _drop_database(
 
 async def _clear_tables(root_settings: SurrealSaverSettings) -> None:
     async with async_surreal_client(root_settings) as conn:
-        await conn.query("DELETE checkpoints;")
-        await conn.query("DELETE writes;")
+        await conn.query(f"DELETE {root_settings.checkpoints_table};")
+        await conn.query(f"DELETE {root_settings.writes_table};")
 
 
 @pytest.fixture(autouse=True)

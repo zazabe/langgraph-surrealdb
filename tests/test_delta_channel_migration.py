@@ -111,7 +111,7 @@ def test_migration_preserves_pre_migration_state_sync(settings) -> None:
         for cfg, items in pre_boundaries:
             snap = delta.get_state(cfg)
             assert list(snap.values.get("items", [])) == items, (
-                f"snapshot mismatch at {cfg['configurable']['checkpoint_id']}: "
+                f"snapshot mismatch at {cfg.get('configurable', {}).get('checkpoint_id', 'unknown')}: "
                 f"expected {items}, got {snap.values.get('items', [])}"
             )
 
@@ -158,4 +158,4 @@ async def test_migration_preserves_pre_migration_state_async(settings) -> None:
             snap = await delta.aget_state(cfg)
             assert (
                 list(snap.values.get("items", [])) == items
-            ), f"async snapshot mismatch at {cfg['configurable']['checkpoint_id']}"
+            ), f"async snapshot mismatch at {cfg.get('configurable', {}).get('checkpoint_id', 'unknown')}"

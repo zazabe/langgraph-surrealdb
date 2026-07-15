@@ -168,7 +168,8 @@ def test_seed_present_when_snapshot_in_ancestor_sync(settings) -> None:
         # in any future override has something to hit.
         parent_tup.checkpoint["channel_versions"].setdefault("items", 1)
         saver.put(
-            parent_tup.parent_config or {"configurable": parent_cfg["configurable"]},
+            parent_tup.parent_config
+            or {"configurable": parent_cfg.get("configurable", {})},
             parent_tup.checkpoint,
             parent_tup.metadata,
             {},
