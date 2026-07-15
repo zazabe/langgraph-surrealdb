@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/zazabe/langgraph-surrealdb/compare/langgraph-surrealdb-v0.2.1...langgraph-surrealdb-v0.3.0) (2026-07-15)
+
+
+### Features
+
+* Configurable checkpoint table names ([#12](https://github.com/zazabe/langgraph-surrealdb/issues/12)) ([e008f40](https://github.com/zazabe/langgraph-surrealdb/commit/e008f4091534f68a0edf27ae03dfdc988f6b6175))
+* support explicit SurrealDB auth modes ([e5ce462](https://github.com/zazabe/langgraph-surrealdb/commit/e5ce462c944b7596bcb2c04d40eb065a25e00d43))
+
 ## [0.2.1](https://github.com/zazabe/langgraph-surrealdb/compare/langgraph-surrealdb-v0.2.0...langgraph-surrealdb-v0.2.1) (2026-07-03)
 
 
