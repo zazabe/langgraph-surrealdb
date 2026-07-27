@@ -22,11 +22,7 @@ from langgraph_surrealdb.checkpoint.config import (
     FullCheckpointConfig,
     PartialCheckpointConfig,
 )
-from langgraph_surrealdb.database.common import (
-    SurrealSaverSettings,
-    surreal_client,
-)
-from langgraph_surrealdb.database.interface import SurrealConnection
+from langgraph_surrealdb.database import SurrealConnection, surreal_client
 from langgraph_surrealdb.database.models.checkpoint import (
     DbCheckpoint,
     DbCheckpointsModelFactory,
@@ -36,6 +32,7 @@ from langgraph_surrealdb.database.repository.checkpoints import (
     DbCheckpointsRepository,
 )
 from langgraph_surrealdb.database.repository.writes import DbWritesRepository
+from langgraph_surrealdb.database.settings import SurrealSaverSettings
 
 _AIO_ERROR_MSG = (
     "The SurrealSaver does not support async methods. "
@@ -212,7 +209,7 @@ class SurrealSaver(BaseCheckpointSaver[str]):
                 else:
                     exists = self.repo_writes.get_by_id(write.id)
                     if not exists:
-                        self.repo_writes.create(write)
+                        self.repo_writes.upsert(write)
 
     def delete_thread(self, thread_id: str) -> None:
         self._ensure_ready()

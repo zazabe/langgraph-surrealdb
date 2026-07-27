@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager, contextmanager
 from surrealdb import AsyncSurreal, Surreal
 from surrealdb.types import Value
 
-from langgraph_surrealdb.database.interface import (
+from langgraph_surrealdb.database.client.interface import (
     SurrealAsyncConnection,
     SurrealConnection,
 )

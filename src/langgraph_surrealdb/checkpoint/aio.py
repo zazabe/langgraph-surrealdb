@@ -22,11 +22,7 @@ from langgraph_surrealdb.checkpoint.config import (
     FullCheckpointConfig,
     PartialCheckpointConfig,
 )
-from langgraph_surrealdb.database.common import (
-    SurrealSaverSettings,
-    async_surreal_client,
-)
-from langgraph_surrealdb.database.interface import SurrealAsyncConnection
+from langgraph_surrealdb.database import SurrealAsyncConnection, async_surreal_client
 from langgraph_surrealdb.database.models.checkpoint import (
     DbCheckpoint,
     DbCheckpointsModelFactory,
@@ -38,6 +34,7 @@ from langgraph_surrealdb.database.repository.checkpoints import (
 from langgraph_surrealdb.database.repository.writes import (
     DbAsyncWritesRepository,
 )
+from langgraph_surrealdb.database.settings import SurrealSaverSettings
 
 
 class AsyncSurrealSaver(BaseCheckpointSaver[str]):
@@ -286,7 +283,7 @@ class AsyncSurrealSaver(BaseCheckpointSaver[str]):
                 else:
                     exists = await self.repo_writes.get_by_id(write.id)
                     if not exists:
-                        await self.repo_writes.create(write)
+                        await self.repo_writes.upsert(write)
 
     async def adelete_thread(self, thread_id: str) -> None:
         await self._ensure_ready()

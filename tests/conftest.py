@@ -14,7 +14,7 @@ from surrealdb import SurrealError
 from langgraph_surrealdb import RootAuth, SurrealSaverDatabaseSettings
 from langgraph_surrealdb.checkpoint import SurrealSaver
 from langgraph_surrealdb.database import async_surreal_client
-from langgraph_surrealdb.database.common import SurrealSaverSettings
+from langgraph_surrealdb.database.settings import SurrealSaverSettings
 
 NonEmpty = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
@@ -123,11 +123,11 @@ async def _ensure_database(
 ) -> None:
     async with async_surreal_client(root_settings) as conn:
         try:
-            await conn.query(f"DEFINE DATABASE `{database_name}`;")
+            await conn.query_raw(f"DEFINE DATABASE `{database_name}`;")
         except SurrealError as e:
             if "already exists" in str(e):
-                await conn.query(f"REMOVE DATABASE `{database_name}`;")
-                await conn.query(f"DEFINE DATABASE `{database_name}`;")
+                await conn.query_raw(f"REMOVE DATABASE `{database_name}`;")
+                await conn.query_raw(f"DEFINE DATABASE `{database_name}`;")
             else:
                 raise
 
