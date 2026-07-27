@@ -7,14 +7,19 @@ from langgraph.checkpoint.base import (
     get_checkpoint_metadata,
 )
 from langgraph.checkpoint.serde.base import SerializerProtocol
-from pydantic import BaseModel, ConfigDict, Field, GetCoreSchemaHandler, ValidationInfo
+from pydantic import Field, GetCoreSchemaHandler, ValidationInfo
 from pydantic_core import CoreSchema, core_schema
 
 from langgraph_surrealdb.checkpoint.config import FullCheckpointConfig
-from langgraph_surrealdb.database.models import DbRecordId
+from langgraph_surrealdb.database.models.common import DbRecordId, SurrealModel
 
 
 class DbCheckpointId(DbRecordId):
+
+    @property
+    def record_type(self) -> type["DbCheckpoint"]:
+        return DbCheckpoint
+
     @classmethod
     def from_ids(
         cls, *, table: str, thread_id: str, checkpoint_ns: str, checkpoint_id: str
@@ -48,9 +53,7 @@ class DbCheckpointId(DbRecordId):
         )
 
 
-class DbCheckpoint(BaseModel):
-    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
-
+class DbCheckpoint(SurrealModel):
     id: DbCheckpointId = Field(exclude=True)
     thread_id: str
     checkpoint: bytes

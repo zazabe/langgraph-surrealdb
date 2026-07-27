@@ -1,11 +1,10 @@
+from abc import ABC
 from typing import Any
 
-from langgraph_surrealdb.database import (
+from langgraph_surrealdb.database.client.interface import (
     SurrealAsyncConnection,
     SurrealConnection,
 )
-from langgraph_surrealdb.database.common import select_result
-from langgraph_surrealdb.database.interface import QueryRawResult
 from langgraph_surrealdb.database.models.write import (
     DbWrite,
     DbWriteId,
@@ -47,7 +46,14 @@ ORDER BY task_id ASC, idx ASC
 """
 
 
-class DbWritesRepository:
+class BaseDbWritesRepository(ABC):
+    _model_factory: DbWritesModelFactory
+
+    def _sql(self, query: str, params: dict[str, Any] | None = None) -> str:
+        return self._model_factory.sql(query, params)
+
+
+class DbWritesRepository(BaseDbWritesRepository):
     def __init__(self, conn: SurrealConnection, model_factory: DbWritesModelFactory):
         self._conn = conn
         self._model_factory = model_factory
@@ -56,42 +62,31 @@ class DbWritesRepository:
         self._conn.query(self._sql(SETUP_QUERY))
 
     def probe(self) -> None:
-        raw: QueryRawResult[dict[str, int]] = self._conn.query_raw(
-            self._sql(PROBE_QUERY)
-        )
-        first = raw.first()
-        if not first or first.status == "ERR":
-            error = first.result if first else "Unknown error"
+        try:
+            self._conn.query_raw(self._sql(PROBE_QUERY)).check()
+        except Exception as e:
             raise RuntimeError(
-                f"Failed to probe writes table. Call setup() first, error: {error}"
-            )
-
-    def create(self, write: DbWrite) -> None:
-        self._conn.create(write.id, write.model_dump())
+                "Failed to probe checkpoints table. Call setup() first"
+            ) from e
 
     def get_by_id(self, id: DbWriteId) -> DbWrite | None:
-        raw = self._conn.select(id.record_id)
-        results = select_result(raw)
-        return self._model_factory.parse(results[0]) if results else None
+        return self._conn.select(id)
 
     def upsert(self, write: DbWrite) -> None:
-        id = write.id.record_id
-        data = write.model_dump()
-        self._conn.upsert(id, data)
+        self._conn.upsert(write)
 
     def fetch(
         self, thread_id: str, checkpoint_ns: str, checkpoint_id: str
     ) -> list[DbWrite]:
-        raw = self._conn.query(
+        return self._conn.query(
             self._sql(SELECT_QUERY),
             {
                 "thread_id": thread_id,
                 "checkpoint_ns": checkpoint_ns,
                 "checkpoint_id": checkpoint_id,
             },
+            result_type=list[DbWrite],
         )
-        result = select_result(raw)
-        return [self._model_factory.parse(row) for row in result or []]
 
     def delete_thread(self, thread_id: str) -> None:
         self._conn.query(
@@ -99,11 +94,8 @@ class DbWritesRepository:
             {"thread_id": thread_id},
         )
 
-    def _sql(self, query: str, params: dict[str, Any] | None = None) -> str:
-        return self._model_factory.sql(query, params)
 
-
-class DbAsyncWritesRepository:
+class DbAsyncWritesRepository(BaseDbWritesRepository):
     def __init__(
         self, conn: SurrealAsyncConnection, model_factory: DbWritesModelFactory
     ):
@@ -114,46 +106,34 @@ class DbAsyncWritesRepository:
         await self._conn.query(self._sql(SETUP_QUERY))
 
     async def probe(self) -> None:
-        raw: QueryRawResult[dict[str, int]] = await self._conn.query_raw(
-            self._sql(PROBE_QUERY)
-        )
-        first = raw.first()
-        if not first or first.status == "ERR":
-            error = first.result if first else "Unknown error"
+        try:
+            (await self._conn.query_raw(self._sql(PROBE_QUERY))).check()
+        except Exception as e:
             raise RuntimeError(
-                f"Failed to probe writes table. Call setup() first, error: {error}"
-            )
-
-    async def create(self, write: DbWrite) -> None:
-        await self._conn.create(write.id, write.model_dump())
+                "Failed to probe checkpoints table. Call setup() first"
+            ) from e
 
     async def get_by_id(self, id: DbWriteId) -> DbWrite | None:
-        raw = await self._conn.select(id.record_id)
-        results = select_result(raw)
-        return self._model_factory.parse(results[0]) if results else None
+        return await self._conn.select(id)
 
     async def upsert(self, write: DbWrite) -> None:
-        await self._conn.upsert(write.id, write.model_dump())
+        await self._conn.upsert(write)
 
     async def fetch(
         self, thread_id: str, checkpoint_ns: str, checkpoint_id: str
     ) -> list[DbWrite]:
-        raw = await self._conn.query(
+        return await self._conn.query(
             self._sql(SELECT_QUERY),
             {
                 "thread_id": thread_id,
                 "checkpoint_ns": checkpoint_ns,
                 "checkpoint_id": checkpoint_id,
             },
+            result_type=list[DbWrite],
         )
-        result = select_result(raw)
-        return [self._model_factory.parse(row) for row in result or []]
 
     async def delete_thread(self, thread_id: str) -> None:
         await self._conn.query(
             self._sql("DELETE FROM {table} WHERE thread_id = $thread_id"),
             {"thread_id": thread_id},
         )
-
-    def _sql(self, query: str, params: dict[str, Any] | None = None) -> str:
-        return self._model_factory.sql(query, params)

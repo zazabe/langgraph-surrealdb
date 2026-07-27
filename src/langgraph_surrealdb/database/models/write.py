@@ -2,13 +2,17 @@ from typing import Any, Self
 
 from langgraph.checkpoint.base import PendingWrite
 from langgraph.checkpoint.serde.base import SerializerProtocol
-from pydantic import BaseModel, ConfigDict, Field, GetCoreSchemaHandler, ValidationInfo
+from pydantic import Field, GetCoreSchemaHandler, ValidationInfo
 from pydantic_core import CoreSchema, core_schema
 
-from langgraph_surrealdb.database.models import DbRecordId
+from langgraph_surrealdb.database.models.common import DbRecordId, SurrealModel
 
 
 class DbWriteId(DbRecordId):
+    @property
+    def record_type(self) -> type["DbWrite"]:
+        return DbWrite
+
     @classmethod
     def from_ids(
         cls,
@@ -46,9 +50,7 @@ class DbWriteId(DbRecordId):
         )
 
 
-class DbWrite(BaseModel):
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-
+class DbWrite(SurrealModel):
     id: DbWriteId = Field(exclude=True)
     thread_id: str
     checkpoint_ns: str

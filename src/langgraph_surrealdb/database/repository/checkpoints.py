@@ -1,12 +1,11 @@
 import re
+from abc import ABC
 from typing import Any
 
-from langgraph_surrealdb.database import (
+from langgraph_surrealdb.database.client.interface import (
     SurrealAsyncConnection,
     SurrealConnection,
 )
-from langgraph_surrealdb.database.common import select_result
-from langgraph_surrealdb.database.interface import QueryRawResult
 from langgraph_surrealdb.database.models.checkpoint import (
     DbCheckpoint,
     DbCheckpointId,
@@ -43,7 +42,14 @@ ORDER BY checkpoint_id DESC
 """
 
 
-class DbCheckpointsRepository:
+class BaseDbCheckpointsRepository(ABC):
+    _model_factory: DbCheckpointsModelFactory
+
+    def _sql(self, query: str, params: dict[str, Any] | None = None) -> str:
+        return self._model_factory.sql(query, params)
+
+
+class DbCheckpointsRepository(BaseDbCheckpointsRepository):
     def __init__(
         self, conn: SurrealConnection, model_factory: DbCheckpointsModelFactory
     ):
@@ -54,26 +60,21 @@ class DbCheckpointsRepository:
         self._conn.query(self._sql(SETUP_QUERY))
 
     def probe(self) -> None:
-        raw: QueryRawResult[dict[str, int]] = self._conn.query_raw(
-            self._sql(PROBE_QUERY)
-        )
-        first = raw.first()
-        if not first or first.status == "ERR":
-            error = first.result if first else "Unknown error"
+        try:
+            self._conn.query_raw(self._sql(PROBE_QUERY)).check()
+        except Exception as e:
             raise RuntimeError(
-                f"Failed to probe checkpoints table. Call setup() first, error: {error}"
-            )
+                "Failed to probe checkpoints table. Call setup() first"
+            ) from e
 
     def upsert(self, checkpoint: DbCheckpoint) -> None:
-        self._conn.upsert(checkpoint.id, checkpoint.model_dump())
+        self._conn.upsert(checkpoint)
 
     def get_by_id(self, id: DbCheckpointId) -> DbCheckpoint | None:
-        raw = self._conn.select(id.record_id)
-        results = select_result(raw)
-        return self._model_factory.parse(results[0]) if results else None
+        return self._conn.select(id)
 
     def get_latest(self, thread_id: str, checkpoint_ns: str) -> DbCheckpoint | None:
-        raw = self._conn.query(
+        result = self._conn.query(
             self._sql(
                 SELECT_QUERY,
                 {
@@ -85,9 +86,9 @@ class DbCheckpointsRepository:
                 "thread_id": thread_id,
                 "checkpoint_ns": checkpoint_ns,
             },
+            result_type=list[DbCheckpoint],
         )
-        result = select_result(raw)
-        return self._model_factory.parse(result[0]) if result else None
+        return result[0] if len(result) > 0 else None
 
     def list(
         self,
@@ -108,8 +109,7 @@ class DbCheckpointsRepository:
                 "limit": f"LIMIT {limit}" if limit is not None else "",
             },
         )
-        raw = self._conn.query(query, params)
-        return [self._model_factory.parse(row) for row in select_result(raw) or []]
+        return self._conn.query(query, params, result_type=list[DbCheckpoint])
 
     def delete_thread(self, thread_id: str) -> None:
         self._conn.query(
@@ -117,11 +117,8 @@ class DbCheckpointsRepository:
             {"thread_id": thread_id},
         )
 
-    def _sql(self, query: str, params: dict[str, Any] | None = None) -> str:
-        return self._model_factory.sql(query, params)
 
-
-class DbAsyncCheckpointsRepository:
+class DbAsyncCheckpointsRepository(BaseDbCheckpointsRepository):
     def __init__(
         self, conn: SurrealAsyncConnection, model_factory: DbCheckpointsModelFactory
     ):
@@ -132,30 +129,23 @@ class DbAsyncCheckpointsRepository:
         await self._conn.query(self._sql(SETUP_QUERY))
 
     async def probe(self) -> None:
-        raw: QueryRawResult[dict[str, int]] = await self._conn.query_raw(
-            self._sql(PROBE_QUERY)
-        )
-        first = raw.first()
-        if not first or first.status == "ERR":
-            error = first.result if first else "Unknown error"
+        try:
+            (await self._conn.query_raw(self._sql(PROBE_QUERY))).check()
+        except Exception as e:
             raise RuntimeError(
-                f"Failed to probe checkpoints table. Call setup() first, error: {error}"
-            )
+                "Failed to probe checkpoints table. Call setup() first"
+            ) from e
 
     async def upsert(self, checkpoint: DbCheckpoint) -> None:
-        id = checkpoint.id.record_id
-        data = checkpoint.model_dump()
-        await self._conn.upsert(id, data)
+        await self._conn.upsert(checkpoint)
 
     async def get_by_id(self, id: DbCheckpointId) -> DbCheckpoint | None:
-        raw = await self._conn.select(id.record_id)
-        results = select_result(raw)
-        return self._model_factory.parse(results[0]) if results else None
+        return await self._conn.select(id)
 
     async def get_latest(
         self, thread_id: str, checkpoint_ns: str
     ) -> DbCheckpoint | None:
-        raw = await self._conn.query(
+        result = await self._conn.query(
             self._sql(
                 SELECT_QUERY,
                 {
@@ -167,9 +157,9 @@ class DbAsyncCheckpointsRepository:
                 "thread_id": thread_id,
                 "checkpoint_ns": checkpoint_ns,
             },
+            result_type=list[DbCheckpoint],
         )
-        result = select_result(raw)
-        return self._model_factory.parse(result[0]) if result else None
+        return result[0] if len(result) > 0 else None
 
     async def list(
         self,
@@ -190,8 +180,7 @@ class DbAsyncCheckpointsRepository:
                 "limit": f"LIMIT {limit}" if limit is not None else "",
             },
         )
-        raw = await self._conn.query(query, params)
-        return [self._model_factory.parse(row) for row in select_result(raw) or []]
+        return await self._conn.query(query, params, result_type=list[DbCheckpoint])
 
     async def delete_thread(self, thread_id: str) -> None:
         await self._conn.query(
@@ -200,9 +189,6 @@ class DbAsyncCheckpointsRepository:
                 "thread_id": thread_id,
             },
         )
-
-    def _sql(self, query: str, params: dict[str, Any] | None = None) -> str:
-        return self._model_factory.sql(query, params)
 
 
 _FILTER_PATTERN = re.compile(r"^[a-zA-Z0-9_.-]+$")
