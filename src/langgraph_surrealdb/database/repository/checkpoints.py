@@ -13,16 +13,17 @@ from langgraph_surrealdb.database.models.checkpoint import (
 )
 
 SETUP_QUERY = """
-DEFINE TABLE IF NOT EXISTS {table} SCHEMALESS PERMISSIONS FULL;
-DEFINE FIELD IF NOT EXISTS thread_id ON {table} TYPE string;
-DEFINE FIELD IF NOT EXISTS checkpoint_ns ON {table} TYPE string;
-DEFINE FIELD IF NOT EXISTS checkpoint_id ON {table} TYPE string;
-DEFINE FIELD IF NOT EXISTS checkpoint ON {table} TYPE bytes;
-DEFINE INDEX IF NOT EXISTS checkpoints_lookup ON {table} FIELDS thread_id, checkpoint_ns, checkpoint_id UNIQUE;
+DEFINE TABLE IF NOT EXISTS $table SCHEMALESS PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS thread_id ON $table TYPE string;
+DEFINE FIELD IF NOT EXISTS checkpoint_ns ON $table TYPE string;
+DEFINE FIELD IF NOT EXISTS checkpoint_id ON $table TYPE string;
+DEFINE FIELD IF NOT EXISTS checkpoint ON $table TYPE bytes;
+
+DEFINE INDEX IF NOT EXISTS string::concat($table, "_idx") ON $table FIELDS thread_id, checkpoint_ns, checkpoint_id UNIQUE;
 """
 
 PROBE_QUERY = """
-SELECT count() FROM {table} GROUP ALL;
+SELECT count() FROM type::table($table) GROUP ALL;
 """
 
 SELECT_QUERY = """
@@ -35,18 +36,26 @@ SELECT
     metadata,
     parent_checkpoint_id,
     type
-FROM {table}
+FROM type::table($table)
 WHERE {where}
 ORDER BY checkpoint_id DESC
 {limit}
+"""
+
+DELETE_QUERY = """
+DELETE FROM type::table($table) WHERE thread_id = $thread_id
 """
 
 
 class BaseDbCheckpointsRepository(ABC):
     _model_factory: DbCheckpointsModelFactory
 
-    def _sql(self, query: str, params: dict[str, Any] | None = None) -> str:
-        return self._model_factory.sql(query, params)
+    def _params(self, **kwargs: Any) -> dict[str, Any]:
+        params = {
+            "table": self._model_factory.table,
+        }
+        params.update(kwargs)
+        return params
 
 
 class DbCheckpointsRepository(BaseDbCheckpointsRepository):
@@ -61,11 +70,11 @@ class DbCheckpointsRepository(BaseDbCheckpointsRepository):
         self._model_factory = model_factory
 
     def setup(self) -> None:
-        self._conn.query(self._sql(SETUP_QUERY))
+        self._conn.query(SETUP_QUERY, self._params())
 
     def probe(self) -> None:
         try:
-            self._conn.query_raw(self._sql(PROBE_QUERY)).check()
+            self._conn.query_raw(PROBE_QUERY, self._params()).check()
         except Exception as e:
             raise RuntimeError(
                 "Failed to probe checkpoints table. Call setup() first"
@@ -78,18 +87,16 @@ class DbCheckpointsRepository(BaseDbCheckpointsRepository):
         return self._conn.select(id)
 
     def get_latest(self, thread_id: str, checkpoint_ns: str) -> DbCheckpoint | None:
+        query = SELECT_QUERY.format(
+            where="thread_id = $thread_id AND checkpoint_ns = $checkpoint_ns",
+            limit="LIMIT 1",
+        )
         result = self._conn.query(
-            self._sql(
-                SELECT_QUERY,
-                {
-                    "where": "thread_id = $thread_id AND checkpoint_ns = $checkpoint_ns",
-                    "limit": "LIMIT 1",
-                },
+            query,
+            self._params(
+                thread_id=thread_id,
+                checkpoint_ns=checkpoint_ns
             ),
-            {
-                "thread_id": thread_id,
-                "checkpoint_ns": checkpoint_ns,
-            },
             result_type=list[DbCheckpoint],
         )
         return result[0] if len(result) > 0 else None
@@ -106,20 +113,14 @@ class DbCheckpointsRepository(BaseDbCheckpointsRepository):
         where, params = _search_where(
             thread_id, checkpoint_ns, checkpoint_id, filter, before_checkpoint_id
         )
-        query = self._sql(
-            SELECT_QUERY,
-            {
-                "where": where,
-                "limit": f"LIMIT {limit}" if limit is not None else "",
-            },
+        query = SELECT_QUERY.format(
+            where=where,
+            limit=f"LIMIT {limit}" if limit is not None else "",
         )
-        return self._conn.query(query, params, result_type=list[DbCheckpoint])
+        return self._conn.query(query, self._params(**params), result_type=list[DbCheckpoint])
 
     def delete_thread(self, thread_id: str) -> None:
-        self._conn.query(
-            self._sql("DELETE FROM {table} WHERE thread_id = $thread_id"),
-            {"thread_id": thread_id},
-        )
+        self._conn.query(DELETE_QUERY, self._params(thread_id=thread_id))
 
 
 class DbAsyncCheckpointsRepository(BaseDbCheckpointsRepository):
@@ -134,11 +135,11 @@ class DbAsyncCheckpointsRepository(BaseDbCheckpointsRepository):
         self._model_factory = model_factory
 
     async def setup(self) -> None:
-        await self._conn.query(self._sql(SETUP_QUERY))
+        await self._conn.query(SETUP_QUERY, self._params())
 
     async def probe(self) -> None:
         try:
-            (await self._conn.query_raw(self._sql(PROBE_QUERY))).check()
+            (await self._conn.query_raw(PROBE_QUERY, self._params())).check()
         except Exception as e:
             raise RuntimeError(
                 "Failed to probe checkpoints table. Call setup() first"
@@ -153,18 +154,13 @@ class DbAsyncCheckpointsRepository(BaseDbCheckpointsRepository):
     async def get_latest(
         self, thread_id: str, checkpoint_ns: str
     ) -> DbCheckpoint | None:
+        query = SELECT_QUERY.format(
+            where="thread_id = $thread_id AND checkpoint_ns = $checkpoint_ns",
+            limit="LIMIT 1",
+        )
         result = await self._conn.query(
-            self._sql(
-                SELECT_QUERY,
-                {
-                    "where": "thread_id = $thread_id AND checkpoint_ns = $checkpoint_ns",
-                    "limit": "LIMIT 1",
-                },
-            ),
-            {
-                "thread_id": thread_id,
-                "checkpoint_ns": checkpoint_ns,
-            },
+            query,
+            self._params(thread_id=thread_id, checkpoint_ns=checkpoint_ns),
             result_type=list[DbCheckpoint],
         )
         return result[0] if len(result) > 0 else None
@@ -181,22 +177,14 @@ class DbAsyncCheckpointsRepository(BaseDbCheckpointsRepository):
         where, params = _search_where(
             thread_id, checkpoint_ns, checkpoint_id, filter, before_checkpoint_id
         )
-        query = self._sql(
-            SELECT_QUERY,
-            {
-                "where": where,
-                "limit": f"LIMIT {limit}" if limit is not None else "",
-            },
+        query = SELECT_QUERY.format(
+            where=where,
+            limit=f"LIMIT {limit}" if limit is not None else "",
         )
-        return await self._conn.query(query, params, result_type=list[DbCheckpoint])
+        return await self._conn.query(query, self._params(**params), result_type=list[DbCheckpoint])
 
     async def delete_thread(self, thread_id: str) -> None:
-        await self._conn.query(
-            self._sql("DELETE FROM {table} WHERE thread_id = $thread_id"),
-            {
-                "thread_id": thread_id,
-            },
-        )
+        await self._conn.query(DELETE_QUERY, self._params(thread_id=thread_id))
 
 
 _FILTER_PATTERN = re.compile(r"^[a-zA-Z0-9_.-]+$")

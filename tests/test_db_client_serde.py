@@ -73,7 +73,7 @@ def test_check_raises_for_statement_error() -> None:
     with pytest.raises(SurrealQueryRawResultItemError) as exc_info:
         response.check()
 
-    assert exc_info.value.result == "The table 'missing' does not exist"
+    assert exc_info.value.result == "Item 0 is invalid: The table 'missing' does not exist"
     assert exc_info.value.kind == "QueryError"
 
 

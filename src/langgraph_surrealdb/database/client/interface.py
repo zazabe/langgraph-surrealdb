@@ -184,6 +184,12 @@ class SurrealConnection:
                 query=query,
                 vars=vars,
             ) from e
+        except Exception as e:
+            raise SurrealQueryError(
+                message=f"SurrealDB query failed: {str(e)}",
+                query=query,
+                vars=vars,
+            ) from e
 
     def select(
         self,
