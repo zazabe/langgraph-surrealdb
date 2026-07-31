@@ -12,19 +12,20 @@ from langgraph_surrealdb.database.models.write import (
 )
 
 SETUP_QUERY = """
-DEFINE TABLE IF NOT EXISTS {table} SCHEMALESS PERMISSIONS FULL;
-DEFINE FIELD IF NOT EXISTS thread_id ON {table} TYPE string;
-DEFINE FIELD IF NOT EXISTS checkpoint_ns ON {table} TYPE string;
-DEFINE FIELD IF NOT EXISTS checkpoint_id ON {table} TYPE string;
-DEFINE FIELD IF NOT EXISTS task_id ON {table} TYPE string;
-DEFINE FIELD IF NOT EXISTS idx ON {table} TYPE int;
-DEFINE FIELD IF NOT EXISTS channel ON {table} TYPE string;
-DEFINE FIELD IF NOT EXISTS value ON {table} TYPE bytes;
-DEFINE INDEX IF NOT EXISTS writes_lookup ON {table} FIELDS thread_id, checkpoint_ns, checkpoint_id, task_id, idx UNIQUE;
+DEFINE TABLE IF NOT EXISTS $table SCHEMALESS PERMISSIONS FULL;
+DEFINE FIELD IF NOT EXISTS thread_id ON $table TYPE string;
+DEFINE FIELD IF NOT EXISTS checkpoint_ns ON $table TYPE string;
+DEFINE FIELD IF NOT EXISTS checkpoint_id ON $table TYPE string;
+DEFINE FIELD IF NOT EXISTS task_id ON $table TYPE string;
+DEFINE FIELD IF NOT EXISTS idx ON $table TYPE int;
+DEFINE FIELD IF NOT EXISTS channel ON $table TYPE string;
+DEFINE FIELD IF NOT EXISTS value ON $table TYPE bytes;
+
+DEFINE INDEX IF NOT EXISTS string::concat($table, "_idx") ON $table FIELDS thread_id, checkpoint_ns, checkpoint_id, task_id, idx UNIQUE;
 """
 
 PROBE_QUERY = """
-SELECT count() FROM {table} GROUP ALL;
+SELECT count() FROM type::table($table) GROUP ALL;
 """
 
 SELECT_QUERY = """
@@ -38,19 +39,27 @@ SELECT
     channel,
     type,
     value
-FROM {table}
+FROM type::table($table)
 WHERE thread_id = $thread_id
     AND checkpoint_ns = $checkpoint_ns
     AND checkpoint_id = $checkpoint_id
 ORDER BY task_id ASC, idx ASC
 """
 
+DELETE_QUERY = """
+DELETE FROM type::table($table) WHERE thread_id = $thread_id
+"""
+
 
 class BaseDbWritesRepository(ABC):
     _model_factory: DbWritesModelFactory
 
-    def _sql(self, query: str, params: dict[str, Any] | None = None) -> str:
-        return self._model_factory.sql(query, params)
+    def _params(self, **kwargs: Any) -> dict[str, Any]:
+        params = {
+            "table": self._model_factory.table,
+        }
+        params.update(kwargs)
+        return params
 
 
 class DbWritesRepository(BaseDbWritesRepository):
@@ -63,11 +72,11 @@ class DbWritesRepository(BaseDbWritesRepository):
         self._model_factory = model_factory
 
     def setup(self) -> None:
-        self._conn.query(self._sql(SETUP_QUERY))
+        self._conn.query(SETUP_QUERY, self._params())
 
     def probe(self) -> None:
         try:
-            self._conn.query_raw(self._sql(PROBE_QUERY)).check()
+            self._conn.query_raw(PROBE_QUERY, self._params()).check()
         except Exception as e:
             raise RuntimeError(
                 "Failed to probe checkpoints table. Call setup() first"
@@ -83,20 +92,17 @@ class DbWritesRepository(BaseDbWritesRepository):
         self, thread_id: str, checkpoint_ns: str, checkpoint_id: str
     ) -> list[DbWrite]:
         return self._conn.query(
-            self._sql(SELECT_QUERY),
-            {
-                "thread_id": thread_id,
-                "checkpoint_ns": checkpoint_ns,
-                "checkpoint_id": checkpoint_id,
-            },
+            SELECT_QUERY,
+            self._params(
+                thread_id=thread_id,
+                checkpoint_ns=checkpoint_ns,
+                checkpoint_id=checkpoint_id,
+            ),
             result_type=list[DbWrite],
         )
 
     def delete_thread(self, thread_id: str) -> None:
-        self._conn.query(
-            self._sql("DELETE FROM {table} WHERE thread_id = $thread_id"),
-            {"thread_id": thread_id},
-        )
+        self._conn.query(DELETE_QUERY, {"thread_id": thread_id})
 
 
 class DbAsyncWritesRepository(BaseDbWritesRepository):
@@ -111,11 +117,11 @@ class DbAsyncWritesRepository(BaseDbWritesRepository):
         self._model_factory = model_factory
 
     async def setup(self) -> None:
-        await self._conn.query(self._sql(SETUP_QUERY))
+        await self._conn.query(SETUP_QUERY, self._params())
 
     async def probe(self) -> None:
         try:
-            (await self._conn.query_raw(self._sql(PROBE_QUERY))).check()
+            (await self._conn.query_raw(PROBE_QUERY, self._params())).check()
         except Exception as e:
             raise RuntimeError(
                 "Failed to probe checkpoints table. Call setup() first"
@@ -131,17 +137,14 @@ class DbAsyncWritesRepository(BaseDbWritesRepository):
         self, thread_id: str, checkpoint_ns: str, checkpoint_id: str
     ) -> list[DbWrite]:
         return await self._conn.query(
-            self._sql(SELECT_QUERY),
-            {
-                "thread_id": thread_id,
-                "checkpoint_ns": checkpoint_ns,
-                "checkpoint_id": checkpoint_id,
-            },
+            SELECT_QUERY,
+            self._params(
+                thread_id=thread_id,
+                checkpoint_ns=checkpoint_ns,
+                checkpoint_id=checkpoint_id,
+            ),
             result_type=list[DbWrite],
         )
 
     async def delete_thread(self, thread_id: str) -> None:
-        await self._conn.query(
-            self._sql("DELETE FROM {table} WHERE thread_id = $thread_id"),
-            {"thread_id": thread_id},
-        )
+        await self._conn.query(DELETE_QUERY, self._params(thread_id=thread_id))

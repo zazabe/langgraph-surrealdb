@@ -78,11 +78,12 @@ class QueryRawResult[T: Any](BaseModel):
                 code=self.error.code,
                 cause=self.error.cause,
             )
-        for item in self.items():
+        for index, item in enumerate(self.items()):
             if isinstance(item, QueryRawItemErrResult):
                 raise SurrealQueryRawResultItemError(
-                    item.result,
+                    f"Item {index} is invalid: {item.result}",
                     kind=item.kind,
+                    index=index,
                 )
         return QueryRawCheckedResult[T].model_construct(
             id=self.id,

@@ -55,6 +55,7 @@ class SurrealQueryRawResultItemError(Exception):
         result: Any,
         *,
         kind: str | None = None,
+        index: int,
     ) -> None:
         if isinstance(result, str):
             message = result
@@ -66,6 +67,7 @@ class SurrealQueryRawResultItemError(Exception):
         self.message = message
         self.result = result
         self.kind = kind
+        self.index = index
 
     def __str__(self) -> str:
-        return f"SurrealDB query raw item failed (kind: {self.kind}):\n {self.message}"
+        return f"SurrealDB query raw item failed (index: {self.index}, kind: {self.kind}):\n {self.message}"
