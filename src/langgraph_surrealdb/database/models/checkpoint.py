@@ -125,6 +125,10 @@ class DbCheckpointsModelFactory:
     def __init__(self, table: str = "checkpoints"):
         self._table = table
 
+    @property
+    def table(self) -> str:
+        return self._table
+
     def create_record(
         self,
         *,
