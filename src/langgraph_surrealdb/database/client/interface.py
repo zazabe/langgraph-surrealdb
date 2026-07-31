@@ -65,10 +65,25 @@ class SurrealConnectionProtocol(Protocol):
 
 
 class SurrealConnection:
-    conn: SurrealConnectionProtocol
+    _conn: SurrealConnectionProtocol
 
-    def __init__(self, conn: SurrealConnectionProtocol):
-        self.conn = conn
+    def __init__(
+        self,
+        conn: SurrealConnectionProtocol,
+        validation_context: dict[str, str] | None = None,
+    ):
+        """
+        Create a new connection.
+
+        Args:
+            conn: The connection.
+            validation_context: Pydantic validation context.
+
+        Returns:
+            The new connection.
+        """
+        self._conn = conn
+        self._validation_context = validation_context
 
     def query_raw[T: Any](
         self,
@@ -77,7 +92,7 @@ class SurrealConnection:
     ) -> QueryRawResult[T]:
         params = _normalize_vars(vars)
         try:
-            raw = self.conn.query_raw(query, params=params)
+            raw = self._conn.query_raw(query, params=params)
             return QueryRawResult[Any].model_validate(raw)
         except SurrealError as e:
             raise SurrealQueryError(
@@ -85,6 +100,20 @@ class SurrealConnection:
                 query=query,
                 vars=vars,
             ) from e
+
+    def with_validation_context(
+        self, validation_context: dict[str, str] | None
+    ) -> "SurrealConnection":
+        """
+        Create a new connection with the validation context.
+
+        Args:
+            validation_context: Pydantic validation context.
+
+        Returns:
+            The new connection.
+        """
+        return SurrealConnection(self._conn, validation_context)
 
     @overload
     def query(
@@ -124,8 +153,7 @@ class SurrealConnection:
         Args:
             query: The query to execute.
             vars: The variables to substitute into the query.
-            session_id: The session ID.
-            txn_id: The transaction ID.
+            result_type: The type of the result.
 
         Returns:
             The result of the query.
@@ -139,7 +167,9 @@ class SurrealConnection:
             if result_type is None:
                 checked = response.check()
             else:
-                checked = response.check_as(result_type=result_type)
+                checked = response.check_as(
+                    result_type=result_type, validation_context=self._validation_context
+                )
             first = checked.first()
             if first is None:
                 raise SurrealQueryError(
@@ -159,6 +189,15 @@ class SurrealConnection:
         self,
         record: SurrealRecordId[TSurrealModel],
     ) -> TSurrealModel | None:
+        """
+        Select a record and return the result.
+
+        Args:
+            record: The record to select.
+
+        Returns:
+            The result of the query.
+        """
         return self.query(
             "SELECT * FROM ONLY $record_id",
             vars={"record_id": record.record_id},
@@ -174,8 +213,6 @@ class SurrealConnection:
 
         Args:
             record: The record to upsert.
-            session_id: The session ID.
-            txn_id: The transaction ID.
 
         Returns:
             The before state of the record.
@@ -196,8 +233,6 @@ class SurrealConnection:
 
         Args:
             record: The record to delete.
-            session_id: The session ID.
-            txn_id: The transaction ID.
 
         Returns:
             The before state of the record.
@@ -209,7 +244,7 @@ class SurrealConnection:
         )
 
     def close(self) -> None:
-        return self.conn.close()
+        return self._conn.close()
 
 
 class SurrealAsyncConnectionProtocol(Protocol):
@@ -236,16 +271,48 @@ class SurrealAsyncConnectionProtocol(Protocol):
         data: Value | None = None,
     ) -> Value: ...
 
-    async def delete(self, record: RecordIdType) -> Value: ...
+    async def delete(
+        self,
+        record: RecordIdType,
+    ) -> Value: ...
 
     async def close(self) -> None: ...
 
 
 class SurrealAsyncConnection:
-    conn: SurrealAsyncConnectionProtocol
+    _conn: SurrealAsyncConnectionProtocol
 
-    def __init__(self, conn: SurrealAsyncConnectionProtocol):
-        self.conn = conn
+    def __init__(
+        self,
+        conn: SurrealAsyncConnectionProtocol,
+        validation_context: dict[str, str] | None = None,
+    ):
+        """
+        Create a new connection.
+
+        Args:
+            conn: The connection.
+            validation_context: Pydantic validation context.
+
+        Returns:
+            The new connection.
+        """
+        self._validation_context = validation_context
+        self._conn = conn
+
+    def with_validation_context(
+        self, validation_context: dict[str, str] | None
+    ) -> "SurrealAsyncConnection":
+        """
+        Create a new connection with the validation context.
+
+        Args:
+            validation_context: Pydantic validation context.
+
+        Returns:
+            The new connection.
+        """
+        return SurrealAsyncConnection(self._conn, validation_context)
 
     async def query_raw[T: Any](
         self,
@@ -254,7 +321,7 @@ class SurrealAsyncConnection:
     ) -> QueryRawResult[T]:
         params = _normalize_vars(vars)
         try:
-            raw = await self.conn.query_raw(query, params=params)
+            raw = await self._conn.query_raw(query, params=params)
             return QueryRawResult[Any].model_validate(raw)
         except SurrealError as e:
             raise SurrealQueryError(
@@ -301,8 +368,6 @@ class SurrealAsyncConnection:
         Args:
             query: The query to execute.
             vars: The variables to substitute into the query.
-            session_id: The session ID.
-            txn_id: The transaction ID.
 
         Returns:
             The result of the query.
@@ -316,7 +381,9 @@ class SurrealAsyncConnection:
             if result_type is None:
                 checked = response.check()
             else:
-                checked = response.check_as(result_type=result_type)
+                checked = response.check_as(
+                    result_type=result_type, validation_context=self._validation_context
+                )
             first = checked.first()
             if first is None:
                 raise SurrealQueryError(
@@ -336,6 +403,15 @@ class SurrealAsyncConnection:
         self,
         record: SurrealRecordId[TSurrealModel],
     ) -> TSurrealModel | None:
+        """
+        Select a record and return the result.
+
+        Args:
+            record: The record to select.
+
+        Returns:
+            The result of the query.
+        """
         return await self.query(
             "SELECT * FROM ONLY $record_id",
             vars={"record_id": record.record_id},
@@ -351,15 +427,16 @@ class SurrealAsyncConnection:
 
         Args:
             record: The record to upsert.
-            session_id: The session ID.
-            txn_id: The transaction ID.
 
         Returns:
             The before state of the record.
         """
         result = await self.query(
             "UPSERT ONLY $record_id CONTENT $_content RETURN BEFORE",
-            vars={"record_id": record.record_id, "_content": record.model_dump()},
+            vars={
+                "record_id": record.record_id,
+                "_content": record.model_dump(),
+            },
             result_type=record.record_type | None,
         )
         return result
@@ -373,8 +450,6 @@ class SurrealAsyncConnection:
 
         Args:
             record: The record to delete.
-            session_id: The session ID.
-            txn_id: The transaction ID.
 
         Returns:
             The before state of the record.
@@ -386,4 +461,4 @@ class SurrealAsyncConnection:
         )
 
     async def close(self) -> None:
-        return await self.conn.close()
+        return await self._conn.close()

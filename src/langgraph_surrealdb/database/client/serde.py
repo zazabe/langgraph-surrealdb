@@ -90,18 +90,35 @@ class QueryRawResult[T: Any](BaseModel):
         )
 
     @overload
-    def check_as[R: Any](self, *, result_type: type[R]) -> QueryRawCheckedResult[R]: ...
+    def check_as[R: Any](
+        self,
+        *,
+        result_type: type[R],
+        validation_context: Any | None = None,
+    ) -> QueryRawCheckedResult[R]: ...
 
     @overload
-    def check_as(self, *, result_type: object) -> QueryRawCheckedResult[Any]: ...
+    def check_as(
+        self,
+        *,
+        result_type: object,
+        validation_context: Any | None = None,
+    ) -> QueryRawCheckedResult[Any]: ...
 
-    def check_as(self, *, result_type: object) -> QueryRawCheckedResult[Any]:
+    def check_as(
+        self,
+        *,
+        result_type: object,
+        validation_context: Any | None = None,
+    ) -> QueryRawCheckedResult[Any]:
         checked = self.check()
         result_adapter = TypeAdapter(result_type)
         typed_result = [
             QueryRawItemOkResult[Any](
                 status=item.status,
-                result=result_adapter.validate_python(item.result),
+                result=result_adapter.validate_python(
+                    item.result, context=validation_context
+                ),
                 kind=item.kind,
             )
             for item in checked.result
