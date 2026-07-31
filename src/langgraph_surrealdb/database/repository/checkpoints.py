@@ -93,10 +93,7 @@ class DbCheckpointsRepository(BaseDbCheckpointsRepository):
         )
         result = self._conn.query(
             query,
-            self._params(
-                thread_id=thread_id,
-                checkpoint_ns=checkpoint_ns
-            ),
+            self._params(thread_id=thread_id, checkpoint_ns=checkpoint_ns),
             result_type=list[DbCheckpoint],
         )
         return result[0] if len(result) > 0 else None
@@ -117,7 +114,9 @@ class DbCheckpointsRepository(BaseDbCheckpointsRepository):
             where=where,
             limit=f"LIMIT {limit}" if limit is not None else "",
         )
-        return self._conn.query(query, self._params(**params), result_type=list[DbCheckpoint])
+        return self._conn.query(
+            query, self._params(**params), result_type=list[DbCheckpoint]
+        )
 
     def delete_thread(self, thread_id: str) -> None:
         self._conn.query(DELETE_QUERY, self._params(thread_id=thread_id))
@@ -181,7 +180,9 @@ class DbAsyncCheckpointsRepository(BaseDbCheckpointsRepository):
             where=where,
             limit=f"LIMIT {limit}" if limit is not None else "",
         )
-        return await self._conn.query(query, self._params(**params), result_type=list[DbCheckpoint])
+        return await self._conn.query(
+            query, self._params(**params), result_type=list[DbCheckpoint]
+        )
 
     async def delete_thread(self, thread_id: str) -> None:
         await self._conn.query(DELETE_QUERY, self._params(thread_id=thread_id))

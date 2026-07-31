@@ -11,7 +11,7 @@ from langgraph_surrealdb.database.models.write import (
     DbWritesModelFactory,
 )
 
-SETUP_QUERY = f"""
+SETUP_QUERY = """
 DEFINE TABLE IF NOT EXISTS $table SCHEMALESS PERMISSIONS FULL;
 DEFINE FIELD IF NOT EXISTS thread_id ON $table TYPE string;
 DEFINE FIELD IF NOT EXISTS checkpoint_ns ON $table TYPE string;
@@ -24,11 +24,11 @@ DEFINE FIELD IF NOT EXISTS value ON $table TYPE bytes;
 DEFINE INDEX IF NOT EXISTS string::concat($table, "_idx") ON $table FIELDS thread_id, checkpoint_ns, checkpoint_id, task_id, idx UNIQUE;
 """
 
-PROBE_QUERY = f"""
+PROBE_QUERY = """
 SELECT count() FROM type::table($table) GROUP ALL;
 """
 
-SELECT_QUERY = f"""
+SELECT_QUERY = """
 SELECT
     id,
     thread_id,
