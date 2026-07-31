@@ -1,6 +1,6 @@
 [project]
 name = "langgraph-surrealdb"
-version = "0.3.0"
+version = "0.4.0"
 authors = [
     { name="zazabe-dev", email="zazabe-dev@proton.me" }
 ]
