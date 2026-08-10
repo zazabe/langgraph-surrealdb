@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/zazabe/langgraph-surrealdb/compare/langgraph-surrealdb-v0.3.0...langgraph-surrealdb-v0.4.0) (2026-07-31)
+
+
+### Features
+
+* Enhance error handling and SQL query structure in SurrealDB client ([#16](https://github.com/zazabe/langgraph-surrealdb/issues/16)) ([9e469bf](https://github.com/zazabe/langgraph-surrealdb/commit/9e469bf9862878379c7f9dd72ac733b2224ab236))
+* Enhance SurrealDB client with validation context support ([#15](https://github.com/zazabe/langgraph-surrealdb/issues/15)) ([73db6fe](https://github.com/zazabe/langgraph-surrealdb/commit/73db6feea8217ebef05cbbe6f4fef7c78d4420c2))
+
+
+### Refactoring
+
+* Improve surrealdb client with pydantic support ([#13](https://github.com/zazabe/langgraph-surrealdb/issues/13)) ([d0d3006](https://github.com/zazabe/langgraph-surrealdb/commit/d0d3006397b3a3ef31ec417800e092ac1ecbed4c))
+
 ## [0.3.0](https://github.com/zazabe/langgraph-surrealdb/compare/langgraph-surrealdb-v0.2.1...langgraph-surrealdb-v0.3.0) (2026-07-15)
 
 
