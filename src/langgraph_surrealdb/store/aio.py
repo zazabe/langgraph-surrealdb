@@ -239,7 +239,7 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
         if self.embeddings and self._is_index_enabled():
             query_vectors = await self.embeddings.aembed_documents(list(query_texts))
 
-        for query_text, query_vector in zip(query_texts, query_vectors):
+        for query_text, query_vector in zip(query_texts, query_vectors, strict=True):
             queries[hash(query_text)] = SearchQueryIndex(
                 text=query_text, embedding=query_vector
             )

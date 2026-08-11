@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC
-from functools import lru_cache
+from functools import cached_property
 from typing import Any
 
 from langgraph_surrealdb.assets import render_schema
@@ -116,8 +116,7 @@ class DbStoreVectorRepository(BaseDbStoreVectorRepository):
     def probe(self) -> None:
         if self._index_settings.enabled:
             try:
-                installed = self._is_index_enabled()
-                if not installed:
+                if not self.is_index_enabled:
                     raise RuntimeError("Langgraph store is not installed")
             except Exception as exc:
                 raise RuntimeError(
@@ -134,8 +133,8 @@ class DbStoreVectorRepository(BaseDbStoreVectorRepository):
             raise Warning("Indexed vector search is not enabled")
         self._conn.delete(id)
 
-    @lru_cache(maxsize=1)
-    def _is_index_enabled(self) -> bool:
+    @cached_property
+    def is_index_enabled(self) -> bool:
         return self._conn.call(
             "fn::langgraph::store::is_index_enabled", {}, result_type=bool
         )

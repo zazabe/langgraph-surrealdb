@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from abc import ABC
 from datetime import datetime
-from functools import lru_cache
+from functools import cached_property
 from typing import Any
 
 from pydantic import BaseModel
@@ -193,7 +193,7 @@ class DbStoreRepository(BaseDbStoreRepository):
 
     def probe(self) -> None:
         try:
-            if not self._is_installed():
+            if not self.is_installed:
                 raise RuntimeError("Langgraph store is not installed")
         except Exception as exc:
             raise RuntimeError(
@@ -210,7 +210,7 @@ class DbStoreRepository(BaseDbStoreRepository):
         self._conn.delete(id)
 
     def search(self, query: SearchQuery) -> list[DbStoreItem] | list[DbStoreItemScored]:
-        if self._is_index_enabled():
+        if self.is_index_enabled:
             return self._conn.call(
                 "fn::langgraph::store::search_indexed",
                 {
@@ -264,14 +264,14 @@ class DbStoreRepository(BaseDbStoreRepository):
             result_type=list[DbStoreItem],
         )
 
-    @lru_cache(maxsize=1)
-    def _is_installed(self) -> bool:
+    @cached_property
+    def is_installed(self) -> bool:
         return self._conn.call(
             "fn::langgraph::store::is_installed", {}, result_type=bool
         )
 
-    @lru_cache(maxsize=1)
-    def _is_index_enabled(self) -> bool:
+    @cached_property
+    def is_index_enabled(self) -> bool:
         return self._conn.call(
             "fn::langgraph::store::is_index_enabled", {}, result_type=bool
         )
