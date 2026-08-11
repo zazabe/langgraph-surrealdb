@@ -4,7 +4,7 @@ version = "0.4.0"
 authors = [
     { name="zazabe-dev", email="zazabe-dev@proton.me" }
 ]
-description = "SurrealDB storage backend for LangGraph."
+description = "SurrealDB checkpoint persistence and cross-thread stores for LangGraph."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
