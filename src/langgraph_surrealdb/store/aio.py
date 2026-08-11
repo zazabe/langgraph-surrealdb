@@ -60,10 +60,8 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
     ) -> None:
         super().__init__()
         self.store_factory = DbStoreModelFactory(table=settings.store_table)
-        self.vector_factory = DbStoreVectorModelFactory(
-            table=settings.vector_table)
-        self.store_repo = DbAsyncStoreRepository(
-            conn, self.store_factory, settings.ttl)
+        self.vector_factory = DbStoreVectorModelFactory(table=settings.vector_table)
+        self.store_repo = DbAsyncStoreRepository(conn, self.store_factory, settings.ttl)
         self.vector_repo = DbAsyncStoreVectorRepository(
             conn, self.vector_factory, settings.index
         )
@@ -150,8 +148,7 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
                 )
             if SearchOp in grouped:
                 await self._batch_search(
-                    cast(Sequence[tuple[int, SearchOp]],
-                         grouped[SearchOp]), results
+                    cast(Sequence[tuple[int, SearchOp]], grouped[SearchOp]), results
                 )
             if ListNamespacesOp in grouped:
                 await self._batch_list_namespaces(
@@ -171,8 +168,7 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
         results: list[Result],
     ) -> None:
         for result_index, op in ops:
-            item_id = self.store_factory.create_id(
-                namespace=op.namespace, key=op.key)
+            item_id = self.store_factory.create_id(namespace=op.namespace, key=op.key)
             item = await self.store_repo.get_by_id(item_id)
             if item is None:
                 continue
@@ -182,8 +178,7 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
                 and self.settings.ttl.refresh_on_read
                 and item.ttl_minutes is not None
             ):
-                expires_at = datetime.now(
-                    UTC) + timedelta(minutes=item.ttl_minutes)
+                expires_at = datetime.now(UTC) + timedelta(minutes=item.ttl_minutes)
                 await self.store_repo.refresh_expiry(item.id, expires_at)
             results[result_index] = item.to_item()
 
@@ -197,8 +192,7 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
 
         prepared: list[DbStoreItemWithVectorRequests] = []
         for op in deduplicated.values():
-            item_id = self.store_factory.create_id(
-                namespace=op.namespace, key=op.key)
+            item_id = self.store_factory.create_id(namespace=op.namespace, key=op.key)
             item = await self.store_repo.get_by_id(item_id)
             if op.value is None:
                 if item is not None:
@@ -302,10 +296,9 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
                     )
                 }
             if op.max_depth is not None:
-                namespaces = {namespace[: op.max_depth]
-                              for namespace in namespaces}
+                namespaces = {namespace[: op.max_depth] for namespace in namespaces}
             ordered = sorted(namespaces)
-            results[result_index] = ordered[op.offset: op.offset + op.limit]
+            results[result_index] = ordered[op.offset : op.offset + op.limit]
 
     async def sweep_ttl(self) -> int:
         await self._ensure_ready()
@@ -330,11 +323,9 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
         self._ttl_stop_event.clear()
 
         interval = float(
-            sweep_interval_minutes or self.ttl_config.get(
-                "sweep_interval_minutes") or 5
+            sweep_interval_minutes or self.ttl_config.get("sweep_interval_minutes") or 5
         )
-        logger.info(
-            f"Starting store TTL sweeper with interval {interval} minutes")
+        logger.info(f"Starting store TTL sweeper with interval {interval} minutes")
 
         async def _sweep_loop() -> None:
             while not self._ttl_stop_event.is_set():
@@ -350,13 +341,11 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
 
                     expired_items = await self.sweep_ttl()
                     if expired_items > 0:
-                        logger.info(
-                            f"Store swept {expired_items} expired items")
+                        logger.info(f"Store swept {expired_items} expired items")
                 except asyncio.CancelledError:
                     break
                 except Exception as exc:
-                    logger.exception(
-                        "Store TTL sweep iteration failed", exc_info=exc)
+                    logger.exception("Store TTL sweep iteration failed", exc_info=exc)
 
         task = asyncio.create_task(_sweep_loop())
         task.set_name("ttl_sweeper")

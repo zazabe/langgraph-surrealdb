@@ -235,18 +235,13 @@ async def test_ttl_sweeper_deletes_expired_items(
     ttl_settings = SurrealStoreTTLSettings(enabled=True, refresh_on_read=False)
     async with async_store_factory(ttl=ttl_settings) as store:
         await store.aput(("ttl-sweeper",), "item", {"value": 1}, ttl=1 / 60)
-        assert (
-            await store.aget(("ttl-sweeper",), "item", refresh_ttl=False)
-            is not None
-        )
+        assert await store.aget(("ttl-sweeper",), "item", refresh_ttl=False) is not None
 
         sweeper = await store.start_ttl_sweeper(sweep_interval_minutes=0.001)
         try:
             async with asyncio.timeout(2):
                 while (
-                    await store.aget(
-                        ("ttl-sweeper",), "item", refresh_ttl=False
-                    )
+                    await store.aget(("ttl-sweeper",), "item", refresh_ttl=False)
                     is not None
                 ):
                     await asyncio.sleep(0.02)
@@ -272,12 +267,9 @@ async def test_ttl_defaults_overrides_and_removal(
 
         await asyncio.sleep(0.1)
         assert await store.sweep_ttl() == 1
+        assert await store.aget(("ttl-config",), "default", refresh_ttl=False) is None
         assert (
-            await store.aget(("ttl-config",), "default", refresh_ttl=False) is None
-        )
-        assert (
-            await store.aget(("ttl-config",), "override", refresh_ttl=False)
-            is not None
+            await store.aget(("ttl-config",), "override", refresh_ttl=False) is not None
         )
         assert await store.aget(("ttl-config",), "never", refresh_ttl=False) is not None
 
@@ -285,8 +277,7 @@ async def test_ttl_defaults_overrides_and_removal(
         await asyncio.sleep(0.15)
         assert await store.sweep_ttl() == 0
         assert (
-            await store.aget(("ttl-config",), "override", refresh_ttl=False)
-            is not None
+            await store.aget(("ttl-config",), "override", refresh_ttl=False) is not None
         )
 
 
