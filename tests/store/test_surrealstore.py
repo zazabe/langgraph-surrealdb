@@ -204,18 +204,12 @@ async def test_search_ttl_refresh(
 
         query = "apple" if indexed else None
         assert store.search(("ttl-search-default",), query=query)
-        assert store.search(
-            ("ttl-search-disabled",), query=query, refresh_ttl=False
-        )
+        assert store.search(("ttl-search-disabled",), query=query, refresh_ttl=False)
         time.sleep(0.35)
 
         assert store.sweep_ttl() == 1
-        assert store.get(
-            ("ttl-search-default",), "item", refresh_ttl=False
-        ) is not None
-        assert (
-            store.get(("ttl-search-disabled",), "item", refresh_ttl=False) is None
-        )
+        assert store.get(("ttl-search-default",), "item", refresh_ttl=False) is not None
+        assert store.get(("ttl-search-disabled",), "item", refresh_ttl=False) is None
 
 
 async def test_ttl_sweeper_deletes_expired_items(

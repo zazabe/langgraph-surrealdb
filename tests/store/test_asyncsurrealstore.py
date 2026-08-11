@@ -258,15 +258,9 @@ async def test_search_ttl_refresh(
         fields=["text"],
     )
     embed = CharacterEmbeddings(dims=32) if indexed else None
-    async with async_store_factory(
-        ttl=ttl_settings, index=index, embed=embed
-    ) as store:
-        await store.aput(
-            ("ttl-search-default",), "item", {"text": "apple"}, ttl=0.01
-        )
-        await store.aput(
-            ("ttl-search-disabled",), "item", {"text": "apple"}, ttl=0.01
-        )
+    async with async_store_factory(ttl=ttl_settings, index=index, embed=embed) as store:
+        await store.aput(("ttl-search-default",), "item", {"text": "apple"}, ttl=0.01)
+        await store.aput(("ttl-search-disabled",), "item", {"text": "apple"}, ttl=0.01)
         await asyncio.sleep(0.35)
 
         query = "apple" if indexed else None
@@ -278,15 +272,11 @@ async def test_search_ttl_refresh(
 
         assert await store.sweep_ttl() == 1
         assert (
-            await store.aget(
-                ("ttl-search-default",), "item", refresh_ttl=False
-            )
+            await store.aget(("ttl-search-default",), "item", refresh_ttl=False)
             is not None
         )
         assert (
-            await store.aget(
-                ("ttl-search-disabled",), "item", refresh_ttl=False
-            )
+            await store.aget(("ttl-search-disabled",), "item", refresh_ttl=False)
             is None
         )
 
