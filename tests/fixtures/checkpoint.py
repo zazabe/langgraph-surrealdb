@@ -23,25 +23,28 @@ async def root_checkpoint_settings(
 
 
 @pytest.fixture(scope="module")
-async def checkpoint_settings(
+async def checkpoint_database(
     root_db_settings: SurrealDatabaseSettings,
-    db_module_name: str,
-) -> AsyncGenerator[SurrealCheckpointSettings, None]:
-    checkpoint_settings = SurrealCheckpointSettings.from_env()
-    checkpoint_settings.db.database = db_module_name
+) -> AsyncGenerator[None, None]:
     await init_database(root_db_settings)
-    yield checkpoint_settings
+    yield
     await drop_database(root_db_settings)
 
 
-@pytest.fixture(autouse=True)
-async def cleanup_checkpoint_tables(
+@pytest.fixture
+async def checkpoint_settings(
     root_checkpoint_settings: SurrealCheckpointSettings,
-    checkpoint_settings: SurrealCheckpointSettings,
-):
+    db_module_name: str,
+    checkpoint_database: None,
+) -> AsyncGenerator[SurrealCheckpointSettings, None]:
+    checkpoint_settings = SurrealCheckpointSettings.from_env()
+    checkpoint_settings.db.database = db_module_name
+
     with SurrealSaver.from_settings(root_checkpoint_settings) as saver:
         saver.setup()
     tables = [checkpoint_settings.checkpoints_table, checkpoint_settings.writes_table]
     await clear_tables(root_checkpoint_settings.db, tables)
-    yield
-    await clear_tables(root_checkpoint_settings.db, tables)
+    try:
+        yield checkpoint_settings
+    finally:
+        await clear_tables(root_checkpoint_settings.db, tables)

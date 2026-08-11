@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Generator
-
 import pytest
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import empty_checkpoint
@@ -10,11 +8,6 @@ from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph_surrealdb.checkpoint.config import FullCheckpointConfig
 from langgraph_surrealdb.database.models.checkpoint import DbCheckpoint
 from langgraph_surrealdb.database.models.write import DbWrite
-
-
-@pytest.fixture(autouse=True)
-def cleanup_checkpoint_tables() -> Generator[None, None, None]:
-    yield
 
 
 def test_db_checkpoint_create_without_parent_checkpoint_id() -> None:
