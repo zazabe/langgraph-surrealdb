@@ -78,6 +78,7 @@ class SurrealStore(BaseStore):
 
         self.lock = threading.Lock()
         self._ttl_sweeper_thread: threading.Thread | None = None
+        self._ttl_sweeper_future: concurrent.futures.Future[None] | None = None
         self._ttl_stop_event = threading.Event()
 
     @classmethod
@@ -329,12 +330,8 @@ class SurrealStore(BaseStore):
 
         if self._ttl_sweeper_thread and self._ttl_sweeper_thread.is_alive():
             logger.info("TTL sweeper thread is already running")
-            # Return a future that can be used to cancel the existing thread
-            future = concurrent.futures.Future()
-            future.add_done_callback(
-                lambda f: self._ttl_stop_event.set() if f.cancelled() else None
-            )
-            return future
+            assert self._ttl_sweeper_future is not None
+            return self._ttl_sweeper_future
 
         self._ttl_stop_event.clear()
 
@@ -359,12 +356,15 @@ class SurrealStore(BaseStore):
                         logger.exception(
                             "Store TTL sweep iteration failed", exc_info=exc
                         )
-                future.set_result(None)
+                if not future.cancelled():
+                    future.set_result(None)
             except Exception as exc:
-                future.set_exception(exc)
+                if not future.cancelled():
+                    future.set_exception(exc)
 
         thread = threading.Thread(target=_sweep_loop, daemon=True, name="ttl-sweeper")
         self._ttl_sweeper_thread = thread
+        self._ttl_sweeper_future = future
         thread.start()
 
         future.add_done_callback(

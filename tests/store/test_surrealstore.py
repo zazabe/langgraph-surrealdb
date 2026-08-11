@@ -239,6 +239,7 @@ async def test_ttl_sweeper_deletes_expired_items(
         assert store.get(("ttl-sweeper",), "item", refresh_ttl=False) is not None
 
         sweeper = store.start_ttl_sweeper(sweep_interval_minutes=0.001)
+        assert store.start_ttl_sweeper(sweep_interval_minutes=0.001) is sweeper
         try:
             deadline = time.monotonic() + 2
             while time.monotonic() < deadline:
