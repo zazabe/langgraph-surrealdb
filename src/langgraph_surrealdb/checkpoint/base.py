@@ -22,6 +22,7 @@ from langgraph_surrealdb.checkpoint.config import (
     FullCheckpointConfig,
     PartialCheckpointConfig,
 )
+from langgraph_surrealdb.checkpoint.settings import SurrealCheckpointSettings
 from langgraph_surrealdb.database import SurrealConnection, surreal_client
 from langgraph_surrealdb.database.models.checkpoint import (
     DbCheckpoint,
@@ -32,7 +33,6 @@ from langgraph_surrealdb.database.repository.checkpoints import (
     DbCheckpointsRepository,
 )
 from langgraph_surrealdb.database.repository.writes import DbWritesRepository
-from langgraph_surrealdb.database.settings import SurrealSaverSettings
 
 _AIO_ERROR_MSG = (
     "The SurrealSaver does not support async methods. "
@@ -68,14 +68,16 @@ class SurrealSaver(BaseCheckpointSaver[str]):
     @classmethod
     @contextmanager
     def from_env(cls) -> Iterator[SurrealSaver]:
-        settings = SurrealSaverSettings.from_env()
+        settings = SurrealCheckpointSettings.from_env()
         with cls.from_settings(settings) as saver:
             yield saver
 
     @classmethod
     @contextmanager
-    def from_settings(cls, settings: SurrealSaverSettings) -> Iterator[SurrealSaver]:
-        with surreal_client(settings) as conn:
+    def from_settings(
+        cls, settings: SurrealCheckpointSettings
+    ) -> Iterator[SurrealSaver]:
+        with surreal_client(settings.db) as conn:
             yield cls(
                 conn,
                 checkpoints_table=settings.checkpoints_table,

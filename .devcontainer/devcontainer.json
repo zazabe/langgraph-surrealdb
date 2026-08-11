@@ -20,7 +20,8 @@
         "ms-python.debugpy",
         "ms-python.black-formatter",
         "tamasfe.even-better-toml",
-        "littlefoxteam.vscode-python-test-adapter"
+        "littlefoxteam.vscode-python-test-adapter",
+        "surrealdb.surrealql"
       ]
     }
   }

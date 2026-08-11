@@ -126,3 +126,37 @@ async with AsyncSurrealSaver.from_env() as checkpointer:
 ```
 
 Then reuse the same `thread_id` to resume conversation state across calls.
+
+## Use the asynchronous store
+
+`AsyncSurrealStore` implements LangGraph's cross-thread store API, including
+structured filters, namespace listing, TTL, and optional semantic search.
+
+```python
+from langgraph_surrealdb import AsyncSurrealStore
+
+async with AsyncSurrealStore.from_env(
+    ttl={"default_ttl": 60, "refresh_on_read": True},
+) as store:
+    await store.setup()
+    await store.aput(
+        ("users", "user-1"),
+        "preferences",
+        {"theme": "dark"},
+    )
+    item = await store.aget(("users", "user-1"), "preferences")
+```
+
+Pass an embedding configuration to enable semantic search:
+
+```python
+async with AsyncSurrealStore.from_env(
+    index={
+        "dims": 1536,
+        "embed": embeddings,
+        "fields": ["text"],
+    },
+) as store:
+    await store.setup()
+    results = await store.asearch(("documents",), query="deployment guide")
+```
