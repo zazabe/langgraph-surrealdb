@@ -25,6 +25,7 @@ from langgraph.store.base.embed import EmbeddingsFunc
 from langgraph_surrealdb.database import SurrealConnection, surreal_client
 from langgraph_surrealdb.database.models.store import (
     DbStoreItem,
+    DbStoreItemScored,
     DbStoreModelFactory,
 )
 from langgraph_surrealdb.database.models.store_vector import (
@@ -177,7 +178,6 @@ class SurrealStore(BaseStore):
             if (
                 op.refresh_ttl
                 and self.settings.ttl.enabled
-                and self.settings.ttl.refresh_on_read
                 and item.ttl_minutes is not None
             ):
                 expires_at = datetime.now(UTC) + timedelta(minutes=item.ttl_minutes)
@@ -268,11 +268,16 @@ class SurrealStore(BaseStore):
                 )
             )
 
+            if op.refresh_ttl and self.settings.ttl.enabled:
+                self._refresh_items(result)
             results[result_index] = [item.to_item() for item in result]
 
-    def _refresh_items(self, items: Sequence[DbStoreItem]) -> None:
+    def _refresh_items(
+        self, items: Sequence[DbStoreItem | DbStoreItemScored]
+    ) -> None:
         now = datetime.now(UTC)
-        for item in items:
+        for result in items:
+            item = result.item if isinstance(result, DbStoreItemScored) else result
             if item.ttl_minutes is not None:
                 self.store_repo.refresh_expiry(
                     item.id, now + timedelta(minutes=item.ttl_minutes)

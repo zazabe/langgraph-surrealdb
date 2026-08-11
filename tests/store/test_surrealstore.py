@@ -171,6 +171,53 @@ async def test_ttl_expiry_and_refresh(store_factory: StoreFactory) -> None:
         assert store.get(("ttl",), "item", refresh_ttl=False) is None
 
 
+async def test_get_can_enable_ttl_refresh(
+    store_factory: StoreFactory,
+) -> None:
+    ttl_settings = SurrealStoreTTLSettings(enabled=True, refresh_on_read=False)
+    async with store_factory(ttl=ttl_settings) as store:
+        store.put(("ttl-get-override",), "item", {"value": 1}, ttl=0.01)
+        time.sleep(0.35)
+
+        assert store.get(("ttl-get-override",), "item", refresh_ttl=True) is not None
+        time.sleep(0.35)
+
+        assert store.sweep_ttl() == 0
+
+
+@pytest.mark.parametrize("indexed", [False, True])
+async def test_search_ttl_refresh(
+    store_factory: StoreFactory,
+    indexed: bool,
+) -> None:
+    ttl_settings = SurrealStoreTTLSettings(enabled=True, refresh_on_read=True)
+    index = SurrealStoreIndexSettings(
+        enabled=indexed,
+        dimensions=32,
+        fields=["text"],
+    )
+    embed = CharacterEmbeddings(dims=32) if indexed else None
+    async with store_factory(ttl=ttl_settings, index=index, embed=embed) as store:
+        store.put(("ttl-search-default",), "item", {"text": "apple"}, ttl=0.01)
+        store.put(("ttl-search-disabled",), "item", {"text": "apple"}, ttl=0.01)
+        time.sleep(0.35)
+
+        query = "apple" if indexed else None
+        assert store.search(("ttl-search-default",), query=query)
+        assert store.search(
+            ("ttl-search-disabled",), query=query, refresh_ttl=False
+        )
+        time.sleep(0.35)
+
+        assert store.sweep_ttl() == 1
+        assert store.get(
+            ("ttl-search-default",), "item", refresh_ttl=False
+        ) is not None
+        assert (
+            store.get(("ttl-search-disabled",), "item", refresh_ttl=False) is None
+        )
+
+
 async def test_ttl_sweeper_deletes_expired_items(
     store_factory: StoreFactory,
 ) -> None:

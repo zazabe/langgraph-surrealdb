@@ -229,6 +229,68 @@ async def test_ttl_expiry_and_refresh(async_store_factory: AsyncStoreFactory) ->
         assert await store.aget(("ttl",), "item", refresh_ttl=False) is None
 
 
+async def test_get_can_enable_ttl_refresh(
+    async_store_factory: AsyncStoreFactory,
+) -> None:
+    ttl_settings = SurrealStoreTTLSettings(enabled=True, refresh_on_read=False)
+    async with async_store_factory(ttl=ttl_settings) as store:
+        await store.aput(("ttl-get-override",), "item", {"value": 1}, ttl=0.01)
+        await asyncio.sleep(0.35)
+
+        assert (
+            await store.aget(("ttl-get-override",), "item", refresh_ttl=True)
+            is not None
+        )
+        await asyncio.sleep(0.35)
+
+        assert await store.sweep_ttl() == 0
+
+
+@pytest.mark.parametrize("indexed", [False, True])
+async def test_search_ttl_refresh(
+    async_store_factory: AsyncStoreFactory,
+    indexed: bool,
+) -> None:
+    ttl_settings = SurrealStoreTTLSettings(enabled=True, refresh_on_read=True)
+    index = SurrealStoreIndexSettings(
+        enabled=indexed,
+        dimensions=32,
+        fields=["text"],
+    )
+    embed = CharacterEmbeddings(dims=32) if indexed else None
+    async with async_store_factory(
+        ttl=ttl_settings, index=index, embed=embed
+    ) as store:
+        await store.aput(
+            ("ttl-search-default",), "item", {"text": "apple"}, ttl=0.01
+        )
+        await store.aput(
+            ("ttl-search-disabled",), "item", {"text": "apple"}, ttl=0.01
+        )
+        await asyncio.sleep(0.35)
+
+        query = "apple" if indexed else None
+        assert await store.asearch(("ttl-search-default",), query=query)
+        assert await store.asearch(
+            ("ttl-search-disabled",), query=query, refresh_ttl=False
+        )
+        await asyncio.sleep(0.35)
+
+        assert await store.sweep_ttl() == 1
+        assert (
+            await store.aget(
+                ("ttl-search-default",), "item", refresh_ttl=False
+            )
+            is not None
+        )
+        assert (
+            await store.aget(
+                ("ttl-search-disabled",), "item", refresh_ttl=False
+            )
+            is None
+        )
+
+
 async def test_ttl_sweeper_deletes_expired_items(
     async_store_factory: AsyncStoreFactory,
 ) -> None:
