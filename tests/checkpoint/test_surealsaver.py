@@ -14,15 +14,15 @@ from langgraph.checkpoint.base import (
     empty_checkpoint,
 )
 
-from langgraph_surrealdb import SurrealSaverSettings
+from langgraph_surrealdb import SurrealCheckpointSettings
 from langgraph_surrealdb.checkpoint import SurrealSaver
 from langgraph_surrealdb.database.repository.checkpoints import _search_where
 
 
 class TestSurrealSaver:
     @pytest.fixture(autouse=True)
-    def setup(self, settings: SurrealSaverSettings) -> None:
-        self.settings = settings
+    def setup(self, checkpoint_settings: SurrealCheckpointSettings) -> None:
+        self.settings = checkpoint_settings
 
         # objects for test setup
         self.config_1: RunnableConfig = {

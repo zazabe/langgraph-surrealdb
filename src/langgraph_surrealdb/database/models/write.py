@@ -5,6 +5,7 @@ from langgraph.checkpoint.serde.base import SerializerProtocol
 from pydantic import Field, GetCoreSchemaHandler, ValidationInfo
 from pydantic_core import CoreSchema, core_schema
 
+from langgraph_surrealdb.database.client.common import validate_table_name
 from langgraph_surrealdb.database.models.common import DbRecordId, SurrealModel
 
 
@@ -108,6 +109,7 @@ class DbWrite(SurrealModel):
 
 class DbWritesModelFactory:
     def __init__(self, table: str = "writes"):
+        validate_table_name(table)
         self._table = table
 
     @property
@@ -155,9 +157,3 @@ class DbWritesModelFactory:
             task_id=task_id,
             idx=idx,
         )
-
-    def parse(self, raw: Any) -> DbWrite:
-        return DbWrite.model_validate(raw, context={"expected_table": self._table})
-
-    def sql(self, query: str, params: dict[str, Any] | None = None) -> str:
-        return query.format(table=self._table, **(params or {}))

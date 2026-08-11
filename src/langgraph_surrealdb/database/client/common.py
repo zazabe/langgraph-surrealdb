@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager, contextmanager
 
@@ -10,73 +11,73 @@ from langgraph_surrealdb.database.client.interface import (
     SurrealAsyncConnection,
     SurrealConnection,
 )
-from langgraph_surrealdb.database.settings import (
+from langgraph_surrealdb.settings import (
     RecordAuth,
     RootAuth,
-    SurrealSaverSettings,
+    SurrealDatabaseSettings,
     TokenAuth,
 )
 
 
 @contextmanager
 def surreal_client(
-    settings: SurrealSaverSettings,
+    settings: SurrealDatabaseSettings,
 ) -> Generator[SurrealConnection, None, None]:
-    with Surreal(settings.db.url) as db:
-        match settings.db.auth:
+    with Surreal(settings.url) as db:
+        match settings.auth:
             case TokenAuth():
-                db.authenticate(settings.db.auth.token)
+                db.authenticate(settings.auth.token)
             case RecordAuth():
                 db.signin(
                     {
-                        "database": settings.db.database,
-                        "namespace": settings.db.namespace,
+                        "database": settings.database,
+                        "namespace": settings.namespace,
                         "variables": {
-                            "username": settings.db.auth.username,
-                            "password": settings.db.auth.password,
+                            "username": settings.auth.username,
+                            "password": settings.auth.password,
                         },
-                        "access": settings.db.auth.access,
+                        "access": settings.auth.access,
                     }
                 )
             case RootAuth():
                 db.signin(
                     {
-                        "username": settings.db.auth.username,
-                        "password": settings.db.auth.password,
+                        "username": settings.auth.username,
+                        "password": settings.auth.password,
                     }
                 )
-        db.use(settings.db.namespace, settings.db.database)
+        db.use(settings.namespace, settings.database)
         yield SurrealConnection(db)
 
 
 @asynccontextmanager
 async def async_surreal_client(
-    settings: SurrealSaverSettings,
+    settings: SurrealDatabaseSettings,
 ) -> AsyncGenerator[SurrealAsyncConnection, None]:
-    async with AsyncSurreal(settings.db.url) as db:
-        match settings.db.auth:
+    async with AsyncSurreal(settings.url) as db:
+        match settings.auth:
             case TokenAuth():
-                await db.authenticate(settings.db.auth.token)
+                await db.authenticate(settings.auth.token)
             case RecordAuth():
                 await db.signin(
                     {
-                        "database": settings.db.database,
-                        "namespace": settings.db.namespace,
+                        "database": settings.database,
+                        "namespace": settings.namespace,
                         "variables": {
-                            "username": settings.db.auth.username,
-                            "password": settings.db.auth.password,
+                            "username": settings.auth.username,
+                            "password": settings.auth.password,
                         },
-                        "access": settings.db.auth.access,
+                        "access": settings.auth.access,
                     }
                 )
             case RootAuth():
                 await db.signin(
                     {
-                        "username": settings.db.auth.username,
-                        "password": settings.db.auth.password,
+                        "username": settings.auth.username,
+                        "password": settings.auth.password,
                     }
                 )
-        await db.use(settings.db.namespace, settings.db.database)
+        await db.use(settings.namespace, settings.database)
         yield SurrealAsyncConnection(db)
 
 
@@ -90,3 +91,8 @@ def select_result(result: Value) -> list[dict[str, Value]]:
     if isinstance(result, list):
         return [select_one_result(row) for row in result]
     return []
+
+
+def validate_table_name(table: str) -> None:
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", table):
+        raise ValueError(f"Invalid SurrealDB table name: {table!r}")

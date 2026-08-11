@@ -62,11 +62,7 @@ class DbCheckpointsRepository(BaseDbCheckpointsRepository):
     def __init__(
         self, conn: SurrealConnection, model_factory: DbCheckpointsModelFactory
     ):
-        self._conn = conn.with_validation_context(
-            {
-                "expected_table": model_factory.table,
-            }
-        )
+        self._conn = conn
         self._model_factory = model_factory
 
     def setup(self) -> None:
@@ -126,11 +122,7 @@ class DbAsyncCheckpointsRepository(BaseDbCheckpointsRepository):
     def __init__(
         self, conn: SurrealAsyncConnection, model_factory: DbCheckpointsModelFactory
     ):
-        self._conn = conn.with_validation_context(
-            {
-                "expected_table": model_factory.table,
-            }
-        )
+        self._conn = conn
         self._model_factory = model_factory
 
     async def setup(self) -> None:

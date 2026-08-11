@@ -31,6 +31,7 @@ from langgraph.checkpoint.serde.types import _DeltaSnapshot
 from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
+from langgraph_surrealdb import SurrealCheckpointSettings
 from langgraph_surrealdb.checkpoint import (
     AsyncSurrealSaver,
     SurrealSaver,
@@ -100,16 +101,20 @@ async def _apick_non_root(saver: Any, config: RunnableConfig) -> RunnableConfig:
 # ---------------------------------------------------------------------------
 
 
-def test_empty_channels_returns_empty_mapping_sync(settings) -> None:
+def test_empty_channels_returns_empty_mapping_sync(
+    checkpoint_settings: SurrealCheckpointSettings,
+) -> None:
     """Empty `channels` short-circuits to `{}` without touching storage."""
-    with SurrealSaver.from_settings(settings) as saver:
+    with SurrealSaver.from_settings(checkpoint_settings) as saver:
         config: RunnableConfig = {"configurable": {"thread_id": "empty"}}
         assert saver.get_delta_channel_history(config=config, channels=[]) == {}
 
 
-def test_writes_history_oldest_to_newest_sync(settings) -> None:
+def test_writes_history_oldest_to_newest_sync(
+    checkpoint_settings: SurrealCheckpointSettings,
+) -> None:
     """Per-channel writes accumulated across the walk come back oldest→newest."""
-    with SurrealSaver.from_settings(settings) as saver:
+    with SurrealSaver.from_settings(checkpoint_settings) as saver:
         config: RunnableConfig = {"configurable": {"thread_id": "history-sync"}}
         graph = _delta_graph(saver)
         _drive(graph, config, 3)
@@ -136,9 +141,11 @@ def test_writes_history_oldest_to_newest_sync(settings) -> None:
             ), f"writes not in oldest→newest order: {write_values}"
 
 
-def test_seed_present_when_snapshot_in_ancestor_sync(settings) -> None:
+def test_seed_present_when_snapshot_in_ancestor_sync(
+    checkpoint_settings: SurrealCheckpointSettings,
+) -> None:
     """Inserting a `_DeltaSnapshot` blob at an ancestor → walk returns it as `seed`."""
-    with SurrealSaver.from_settings(settings) as saver:
+    with SurrealSaver.from_settings(checkpoint_settings) as saver:
         config: RunnableConfig = {"configurable": {"thread_id": "seed-sync"}}
         graph = _delta_graph(saver)
         _drive(graph, config, 2)
@@ -187,9 +194,11 @@ def test_seed_present_when_snapshot_in_ancestor_sync(settings) -> None:
         assert seed.value == snapshot_value
 
 
-def test_seed_omitted_when_walk_reaches_root_sync(settings) -> None:
+def test_seed_omitted_when_walk_reaches_root_sync(
+    checkpoint_settings: SurrealCheckpointSettings,
+) -> None:
     """`get_delta_channel_history` on the root checkpoint → no `seed` key, no writes."""
-    with SurrealSaver.from_settings(settings) as saver:
+    with SurrealSaver.from_settings(checkpoint_settings) as saver:
         config: RunnableConfig = {"configurable": {"thread_id": "root-sync"}}
         graph = _delta_graph(saver)
         _drive(graph, config, 1)
@@ -212,16 +221,20 @@ def test_seed_omitted_when_walk_reaches_root_sync(settings) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_empty_channels_returns_empty_mapping_async(settings) -> None:
+async def test_empty_channels_returns_empty_mapping_async(
+    checkpoint_settings: SurrealCheckpointSettings,
+) -> None:
     """Async equivalent of the empty-channels short-circuit."""
-    async with AsyncSurrealSaver.from_settings(settings) as saver:
+    async with AsyncSurrealSaver.from_settings(checkpoint_settings) as saver:
         config: RunnableConfig = {"configurable": {"thread_id": "empty-async"}}
         assert await saver.aget_delta_channel_history(config=config, channels=[]) == {}
 
 
-async def test_writes_history_oldest_to_newest_async(settings) -> None:
+async def test_writes_history_oldest_to_newest_async(
+    checkpoint_settings: SurrealCheckpointSettings,
+) -> None:
     """Async equivalent of the oldest→newest ordering check."""
-    async with AsyncSurrealSaver.from_settings(settings) as saver:
+    async with AsyncSurrealSaver.from_settings(checkpoint_settings) as saver:
         config: RunnableConfig = {"configurable": {"thread_id": "history-async"}}
         graph = _delta_graph(saver)
         await _adrive(graph, config, 3)
@@ -246,9 +259,11 @@ async def test_writes_history_oldest_to_newest_async(settings) -> None:
             ), f"writes not in oldest→newest order: {write_values}"
 
 
-async def test_seed_omitted_when_walk_reaches_root_async(settings) -> None:
+async def test_seed_omitted_when_walk_reaches_root_async(
+    checkpoint_settings: SurrealCheckpointSettings,
+) -> None:
     """Async equivalent of the root-walk seed-absence check."""
-    async with AsyncSurrealSaver.from_settings(settings) as saver:
+    async with AsyncSurrealSaver.from_settings(checkpoint_settings) as saver:
         config: RunnableConfig = {"configurable": {"thread_id": "root-async"}}
         graph = _delta_graph(saver)
         await _adrive(graph, config, 1)

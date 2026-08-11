@@ -6,15 +6,16 @@ import pytest
 from langgraph.checkpoint.conformance import validate
 from langgraph.checkpoint.conformance.initializer import checkpointer_test
 
+from langgraph_surrealdb import SurrealCheckpointSettings
 from langgraph_surrealdb.checkpoint import AsyncSurrealSaver
 
 
 @pytest.mark.asyncio
-async def test_async_conformance(settings):
+async def test_async_conformance(checkpoint_settings: SurrealCheckpointSettings):
 
     @checkpointer_test(name="AsyncSurrealSaver")
     async def sqlite_saver():
-        async with AsyncSurrealSaver.from_settings(settings) as saver:
+        async with AsyncSurrealSaver.from_settings(checkpoint_settings) as saver:
             yield saver
 
     report = await validate(sqlite_saver)

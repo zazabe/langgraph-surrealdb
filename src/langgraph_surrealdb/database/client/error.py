@@ -12,17 +12,25 @@ class SurrealQueryError(Exception):
         *,
         query: str,
         vars: dict[str, Any] | None = None,
+        response: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
         self.query = query
         self.vars = vars
+        self.response = None
+        if response is not None:
+            try:
+                self.response = json.dumps(response, default=str)
+            except Exception:
+                self.response = str(response)
 
     def __str__(self) -> str:
         return dedent(f"""\
             {self.message}
             - query: {self.query}
             - vars: {self.vars}
+            - response: {self.response}
             """)
 
 

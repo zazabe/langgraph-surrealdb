@@ -14,13 +14,14 @@ from langgraph.checkpoint.base import (
     empty_checkpoint,
 )
 
+from langgraph_surrealdb import SurrealCheckpointSettings
 from langgraph_surrealdb.checkpoint import AsyncSurrealSaver
 
 
 class TestAsyncSurrealSaver:
     @pytest.fixture(autouse=True)
-    def setup(self, settings) -> None:
-        self.settings = settings
+    def setup(self, checkpoint_settings: SurrealCheckpointSettings) -> None:
+        self.settings = checkpoint_settings
 
         # objects for test setup
         self.config_1: RunnableConfig = {

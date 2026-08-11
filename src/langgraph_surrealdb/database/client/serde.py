@@ -91,12 +91,23 @@ class QueryRawResult[T: Any](BaseModel):
         )
 
     @overload
-    def check_as[R: Any](
+    def check_as[R: Any](self, *, result_type: type[R]) -> QueryRawCheckedResult[R]: ...
+
+    @overload
+    def check_as(
         self,
         *,
-        result_type: type[R],
+        result_type: object,
         validation_context: Any | None = None,
-    ) -> QueryRawCheckedResult[R]: ...
+    ) -> QueryRawCheckedResult[Any]: ...
+
+    @overload
+    def check_as(
+        self,
+        *,
+        result_type: object,
+        validation_context: Any | None = None,
+    ) -> QueryRawCheckedResult[Any]: ...
 
     @overload
     def check_as(

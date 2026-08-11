@@ -35,6 +35,20 @@ def _normalize_var(vars: Any) -> Value:
     return vars
 
 
+def _build_fn_args(vars: dict[str, Any] | None) -> tuple[str, dict[str, Value]]:
+    if vars is None:
+        return "", {}
+    args = []
+    params = {}
+    for k, v in vars.items():
+        if v is not None:
+            args.append(f"${k}")
+            params[k] = _normalize_var(v)
+        else:
+            args.append("NONE")
+    return ", ".join(args), params
+
+
 class SurrealConnectionProtocol(Protocol):
     def query(
         self,
@@ -101,20 +115,6 @@ class SurrealConnection:
                 vars=vars,
             ) from e
 
-    def with_validation_context(
-        self, validation_context: dict[str, str] | None
-    ) -> "SurrealConnection":
-        """
-        Create a new connection with the validation context.
-
-        Args:
-            validation_context: Pydantic validation context.
-
-        Returns:
-            The new connection.
-        """
-        return SurrealConnection(self._conn, validation_context)
-
     @overload
     def query(
         self,
@@ -180,6 +180,7 @@ class SurrealConnection:
             return first.result
         except ValidationError as e:
             raise SurrealQueryError(
+                response=response.model_dump(),
                 message="Invalid query result type",
                 query=query,
                 vars=vars,
@@ -249,6 +250,45 @@ class SurrealConnection:
             result_type=record.record_type | None,
         )
 
+    @overload
+    def call(
+        self,
+        function: str,
+        vars: dict[str, Any] | None = None,
+    ) -> Any: ...
+
+    @overload
+    def call[T: Any](
+        self,
+        function: str,
+        vars: dict[str, Any] | None = None,
+        *,
+        result_type: type[T],
+    ) -> T: ...
+
+    @overload
+    def call[T: Any](
+        self,
+        function: str,
+        vars: dict[str, Any] | None = None,
+        *,
+        result_type: object,
+    ) -> Any: ...
+
+    def call[T: Any](
+        self,
+        function: str,
+        vars: dict[str, Any] | None = None,
+        *,
+        result_type: object | None = None,
+    ) -> Any:
+        args, vars = _build_fn_args(vars)
+        return self.query(
+            f"RETURN {function}({args})",
+            vars=vars,
+            result_type=result_type,
+        )
+
     def close(self) -> None:
         return self._conn.close()
 
@@ -305,20 +345,6 @@ class SurrealAsyncConnection:
         """
         self._validation_context = validation_context
         self._conn = conn
-
-    def with_validation_context(
-        self, validation_context: dict[str, str] | None
-    ) -> "SurrealAsyncConnection":
-        """
-        Create a new connection with the validation context.
-
-        Args:
-            validation_context: Pydantic validation context.
-
-        Returns:
-            The new connection.
-        """
-        return SurrealAsyncConnection(self._conn, validation_context)
 
     async def query_raw[T: Any](
         self,
@@ -400,6 +426,7 @@ class SurrealAsyncConnection:
             return first.result
         except ValidationError as e:
             raise SurrealQueryError(
+                response=response.model_dump(),
                 message="Invalid query result type",
                 query=query,
                 vars=vars,
@@ -464,6 +491,45 @@ class SurrealAsyncConnection:
             "DELETE ONLY $record_id RETURN BEFORE",
             vars={"record_id": record.record_id},
             result_type=record.record_type | None,
+        )
+
+    @overload
+    async def call(
+        self,
+        function: str,
+        vars: dict[str, Any] | None = None,
+    ) -> Any: ...
+
+    @overload
+    async def call[T: Any](
+        self,
+        function: str,
+        vars: dict[str, Any] | None = None,
+        *,
+        result_type: type[T],
+    ) -> T: ...
+
+    @overload
+    async def call[T: Any](
+        self,
+        function: str,
+        vars: dict[str, Any] | None = None,
+        *,
+        result_type: object,
+    ) -> Any: ...
+
+    async def call[T: Any](
+        self,
+        function: str,
+        vars: dict[str, Any] | None = None,
+        *,
+        result_type: object | None = None,
+    ) -> Any:
+        args, vars = _build_fn_args(vars)
+        return await self.query(
+            f"RETURN {function}({args})",
+            vars=vars,
+            result_type=result_type,
         )
 
     async def close(self) -> None:

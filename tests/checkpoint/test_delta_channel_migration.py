@@ -28,6 +28,7 @@ from langgraph.channels.delta import DeltaChannel
 from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
+from langgraph_surrealdb import SurrealCheckpointSettings
 from langgraph_surrealdb.checkpoint import AsyncSurrealSaver, SurrealSaver
 
 
@@ -89,7 +90,9 @@ def _settled_boundaries(history: list) -> list[tuple[RunnableConfig, list]]:
     ]
 
 
-def test_migration_preserves_pre_migration_state_sync(settings) -> None:
+def test_migration_preserves_pre_migration_state_sync(
+    checkpoint_settings: SurrealCheckpointSettings,
+) -> None:
     """Drive 3 invokes under `BinaryOperatorAggregate`, swap the
     annotation to `DeltaChannel` on the same sqlite-backed thread, and
     verify every settled pre-migration boundary round-trips exactly.
@@ -98,7 +101,7 @@ def test_migration_preserves_pre_migration_state_sync(settings) -> None:
     list at each pre-migration ancestor as a valid `seed` even though
     no `_DeltaSnapshot` was ever written there.
     """
-    with SurrealSaver.from_settings(settings) as saver:
+    with SurrealSaver.from_settings(checkpoint_settings) as saver:
         config: RunnableConfig = {"configurable": {"thread_id": "mig-sync"}}
 
         binop = _binop_graph(saver)
@@ -116,12 +119,14 @@ def test_migration_preserves_pre_migration_state_sync(settings) -> None:
             )
 
 
-def test_migration_continued_thread_folds_deltas_on_seed_sync(settings) -> None:
+def test_migration_continued_thread_folds_deltas_on_seed_sync(
+    checkpoint_settings: SurrealCheckpointSettings,
+) -> None:
     """After migration, driving one more super-step extends the
     pre-migration accumulated state via the delta reducer — the seed
     plus a single new write.
     """
-    with SurrealSaver.from_settings(settings) as saver:
+    with SurrealSaver.from_settings(checkpoint_settings) as saver:
         config: RunnableConfig = {"configurable": {"thread_id": "mig-continue-sync"}}
 
         binop = _binop_graph(saver)
@@ -140,10 +145,12 @@ def test_migration_continued_thread_folds_deltas_on_seed_sync(settings) -> None:
         assert "after-migration" in new_state
 
 
-async def test_migration_preserves_pre_migration_state_async(settings) -> None:
+async def test_migration_preserves_pre_migration_state_async(
+    checkpoint_settings: SurrealCheckpointSettings,
+) -> None:
     """Async equivalent of the basic-migration round-trip check on
     `AsyncSurrealSaver`."""
-    async with AsyncSurrealSaver.from_settings(settings) as saver:
+    async with AsyncSurrealSaver.from_settings(checkpoint_settings) as saver:
         config: RunnableConfig = {"configurable": {"thread_id": "mig-async"}}
 
         binop = _binop_graph(saver)

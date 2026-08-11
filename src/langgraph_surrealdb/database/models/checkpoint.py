@@ -1,4 +1,4 @@
-from typing import Any, Self
+from typing import Self
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import (
@@ -11,6 +11,7 @@ from pydantic import Field, GetCoreSchemaHandler, ValidationInfo
 from pydantic_core import CoreSchema, core_schema
 
 from langgraph_surrealdb.checkpoint.config import FullCheckpointConfig
+from langgraph_surrealdb.database.client.common import validate_table_name
 from langgraph_surrealdb.database.models.common import DbRecordId, SurrealModel
 
 
@@ -123,6 +124,7 @@ class DbCheckpoint(SurrealModel):
 
 class DbCheckpointsModelFactory:
     def __init__(self, table: str = "checkpoints"):
+        validate_table_name(table)
         self._table = table
 
     @property
@@ -154,9 +156,3 @@ class DbCheckpointsModelFactory:
             checkpoint_ns=checkpoint_ns,
             checkpoint_id=checkpoint_id,
         )
-
-    def parse(self, raw: Any) -> DbCheckpoint:
-        return DbCheckpoint.model_validate(raw, context={"expected_table": self._table})
-
-    def sql(self, query: str, params: dict[str, Any] | None = None) -> str:
-        return query.format(table=self._table, **(params or {}))
