@@ -8,12 +8,16 @@ from typing import Any
 from langgraph_surrealdb.assets import render_schema
 from langgraph_surrealdb.database import SurrealConnection
 from langgraph_surrealdb.database.client.interface import SurrealAsyncConnection
+from langgraph_surrealdb.database.models.store import DbStoreItem
 from langgraph_surrealdb.database.models.store_vector import (
     DbStoreVector,
     DbStoreVectorId,
     DbStoreVectorModelFactory,
 )
 from langgraph_surrealdb.store.settings import SurrealStoreIndexSettings
+
+
+DELETE_BY_ITEM_QUERY = "DELETE FROM type::table($vector_table) WHERE item = $item"
 
 
 class BaseDbStoreVectorRepository(ABC):
@@ -64,6 +68,14 @@ class DbAsyncStoreVectorRepository(BaseDbStoreVectorRepository):
         if not self._index_settings.enabled:
             raise Warning("Indexed vector search is not enabled")
         await self._conn.delete(id)
+
+    async def delete_by_item(self, item: DbStoreItem) -> None:
+        if not self._index_settings.enabled:
+            raise Warning("Indexed vector search is not enabled")
+        await self._conn.query(DELETE_BY_ITEM_QUERY, {
+            "vector_table": self._model_factory.table,
+            "item": item,
+        })
 
     async def _is_index_enabled(self) -> bool:
         return await self._lazy_call(
@@ -132,6 +144,14 @@ class DbStoreVectorRepository(BaseDbStoreVectorRepository):
         if not self._index_settings.enabled:
             raise Warning("Indexed vector search is not enabled")
         self._conn.delete(id)
+
+    def delete_by_item(self, item: DbStoreItem) -> None:
+        if not self._index_settings.enabled:
+            raise Warning("Indexed vector search is not enabled")
+        self._conn.query(DELETE_BY_ITEM_QUERY, {
+            "vector_table": self._model_factory.table,
+            "item": item,
+        })
 
     @cached_property
     def is_index_enabled(self) -> bool:

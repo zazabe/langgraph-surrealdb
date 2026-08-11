@@ -17,8 +17,8 @@ class DbStoreVectorId(DbRecordId):
         return DbStoreVector
 
     @classmethod
-    def from_ids(cls, *, table: str, namespace: list[str], key: str) -> DbStoreVectorId:
-        return cls.from_raw(table, namespace, key)
+    def from_ids(cls, *, table: str, namespace: list[str], key: str, field_name: str) -> DbStoreVectorId:
+        return cls.from_raw(table, namespace, key, field_name)
 
     @classmethod
     def _coerce_with_info(cls, value: object, info: ValidationInfo) -> str:
@@ -38,7 +38,8 @@ class DbStoreVectorId(DbRecordId):
     ) -> CoreSchema:
         return core_schema.with_info_before_validator_function(
             cls._coerce_with_info,
-            core_schema.no_info_after_validator_function(cls, core_schema.str_schema()),
+            core_schema.no_info_after_validator_function(
+                cls, core_schema.str_schema()),
         )
 
 
@@ -96,14 +97,15 @@ class DbStoreVectorModelFactory:
     def table(self) -> str:
         return self._table
 
-    def create_id(self, *, namespace: list[str], key: str) -> DbStoreVectorId:
-        return DbStoreVectorId.from_ids(table=self.table, namespace=namespace, key=key)
+    def create_id(self, *, namespace: list[str], key: str, field_name: str) -> DbStoreVectorId:
+        return DbStoreVectorId.from_ids(table=self.table, namespace=namespace, key=key, field_name=field_name)
 
     def create_record(
         self, item: DbStoreItem, field: str, indexed_text: str, embedding: list[float]
     ) -> DbStoreVector:
         return DbStoreVector(
-            id=self.create_id(namespace=item.namespace, key=item.key),
+            id=self.create_id(namespace=item.namespace,
+                              key=item.key, field_name=field),
             item=item.id,
             namespace=item.namespace,
             key=item.key,

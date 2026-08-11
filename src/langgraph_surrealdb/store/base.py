@@ -60,8 +60,10 @@ class SurrealStore(BaseStore):
     ) -> None:
         super().__init__()
         self.store_factory = DbStoreModelFactory(table=settings.store_table)
-        self.vector_factory = DbStoreVectorModelFactory(table=settings.vector_table)
-        self.store_repo = DbStoreRepository(conn, self.store_factory, settings.ttl)
+        self.vector_factory = DbStoreVectorModelFactory(
+            table=settings.vector_table)
+        self.store_repo = DbStoreRepository(
+            conn, self.store_factory, settings.ttl)
         self.vector_repo = DbStoreVectorRepository(
             conn, self.vector_factory, settings.index
         )
@@ -150,7 +152,8 @@ class SurrealStore(BaseStore):
                 )
             if SearchOp in grouped:
                 self._batch_search(
-                    cast(Sequence[tuple[int, SearchOp]], grouped[SearchOp]), results
+                    cast(Sequence[tuple[int, SearchOp]],
+                         grouped[SearchOp]), results
                 )
             if ListNamespacesOp in grouped:
                 self._batch_list_namespaces(
@@ -161,7 +164,8 @@ class SurrealStore(BaseStore):
                     results,
                 )
             if PutOp in grouped:
-                self._batch_put(cast(Sequence[tuple[int, PutOp]], grouped[PutOp]))
+                self._batch_put(
+                    cast(Sequence[tuple[int, PutOp]], grouped[PutOp]))
         return results
 
     def _batch_get(
@@ -170,7 +174,8 @@ class SurrealStore(BaseStore):
         results: list[Result],
     ) -> None:
         for result_index, op in ops:
-            item_id = self.store_factory.create_id(namespace=op.namespace, key=op.key)
+            item_id = self.store_factory.create_id(
+                namespace=op.namespace, key=op.key)
             item = self.store_repo.get_by_id(item_id)
             if item is None:
                 continue
@@ -180,7 +185,8 @@ class SurrealStore(BaseStore):
                 and self.settings.ttl.refresh_on_read
                 and item.ttl_minutes is not None
             ):
-                expires_at = datetime.now(UTC) + timedelta(minutes=item.ttl_minutes)
+                expires_at = datetime.now(
+                    UTC) + timedelta(minutes=item.ttl_minutes)
                 self.store_repo.refresh_expiry(item.id, expires_at)
             results[result_index] = item.to_item()
 
@@ -194,10 +200,13 @@ class SurrealStore(BaseStore):
 
         prepared: list[DbStoreItemWithVectorRequests] = []
         for op in deduplicated.values():
-            item_id = self.store_factory.create_id(namespace=op.namespace, key=op.key)
+            item_id = self.store_factory.create_id(
+                namespace=op.namespace, key=op.key)
             item = self.store_repo.get_by_id(item_id)
             if op.value is None:
                 if item is not None:
+                    if self._is_index_enabled():
+                        self.vector_repo.delete_by_item(item)
                     self.store_repo.delete(item_id)
                 continue
 
@@ -227,8 +236,10 @@ class SurrealStore(BaseStore):
 
         for item_with_vectors in items_with_vectors:
             self.store_repo.upsert(item_with_vectors.item)
-            for vector in item_with_vectors.vectors:
-                self.vector_repo.upsert(vector)
+            if self._is_index_enabled():
+                self.vector_repo.delete_by_item(item_with_vectors.item)
+                for vector in item_with_vectors.vectors:
+                    self.vector_repo.upsert(vector)
 
     def _batch_search(
         self,
@@ -294,9 +305,10 @@ class SurrealStore(BaseStore):
                     )
                 }
             if op.max_depth is not None:
-                namespaces = {namespace[: op.max_depth] for namespace in namespaces}
+                namespaces = {namespace[: op.max_depth]
+                              for namespace in namespaces}
             ordered = sorted(namespaces)
-            results[result_index] = ordered[op.offset : op.offset + op.limit]
+            results[result_index] = ordered[op.offset: op.offset + op.limit]
 
     def sweep_ttl(self) -> int:
         self._ensure_ready()
@@ -313,7 +325,8 @@ class SurrealStore(BaseStore):
             Future that can be waited on or cancelled.
         """
         if not self.ttl_config:
-            future: concurrent.futures.Future[None] = concurrent.futures.Future()
+            future: concurrent.futures.Future[None] = concurrent.futures.Future(
+            )
             future.set_result(None)
             return future
 
@@ -329,9 +342,11 @@ class SurrealStore(BaseStore):
         self._ttl_stop_event.clear()
 
         interval = float(
-            sweep_interval_minutes or self.ttl_config.get("sweep_interval_minutes") or 5
+            sweep_interval_minutes or self.ttl_config.get(
+                "sweep_interval_minutes") or 5
         )
-        logger.info(f"Starting store TTL sweeper with interval {interval} minutes")
+        logger.info(
+            f"Starting store TTL sweeper with interval {interval} minutes")
 
         future = concurrent.futures.Future()
 
@@ -344,7 +359,8 @@ class SurrealStore(BaseStore):
                     try:
                         expired_items = self.sweep_ttl()
                         if expired_items > 0:
-                            logger.info(f"Store swept {expired_items} expired items")
+                            logger.info(
+                                f"Store swept {expired_items} expired items")
                     except Exception as exc:
                         logger.exception(
                             "Store TTL sweep iteration failed", exc_info=exc
@@ -353,7 +369,8 @@ class SurrealStore(BaseStore):
             except Exception as exc:
                 future.set_exception(exc)
 
-        thread = threading.Thread(target=_sweep_loop, daemon=True, name="ttl-sweeper")
+        thread = threading.Thread(
+            target=_sweep_loop, daemon=True, name="ttl-sweeper")
         self._ttl_sweeper_thread = thread
         thread.start()
 
@@ -445,7 +462,8 @@ def matches_namespace(
     if match_type == "prefix":
         candidate = namespace[: len(pattern)]
     elif match_type == "suffix":
-        candidate = namespace[len(namespace) - len(pattern) :] if pattern else ()
+        candidate = namespace[len(namespace) -
+                              len(pattern):] if pattern else ()
     else:
         raise ValueError(f"Unsupported namespace match type: {match_type}")
     return all(
