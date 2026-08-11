@@ -160,13 +160,12 @@ class DbAsyncStoreRepository(BaseDbStoreRepository):
         args: dict[str, Any] | None = None,
         result_type: object | None = None,
     ) -> Any:
-        task = self._tasks.get(
-            function,
-            asyncio.create_task(
+        task = self._tasks.get(function)
+        if task is None:
+            task = asyncio.create_task(
                 self._conn.call(function, args, result_type=result_type)
-            ),
-        )
-        self._tasks[function] = task
+            )
+            self._tasks[function] = task
         try:
             return await task
         except Exception:

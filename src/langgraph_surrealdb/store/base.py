@@ -272,9 +272,7 @@ class SurrealStore(BaseStore):
                 self._refresh_items(result)
             results[result_index] = [item.to_item() for item in result]
 
-    def _refresh_items(
-        self, items: Sequence[DbStoreItem | DbStoreItemScored]
-    ) -> None:
+    def _refresh_items(self, items: Sequence[DbStoreItem | DbStoreItemScored]) -> None:
         now = datetime.now(UTC)
         for result in items:
             item = result.item if isinstance(result, DbStoreItemScored) else result
