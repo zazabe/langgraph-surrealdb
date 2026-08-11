@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/zazabe/langgraph-surrealdb/compare/langgraph-surrealdb-v0.4.0...langgraph-surrealdb-v0.5.0) (2026-08-11)
+
+
+### Features
+
+* Add SurrealDB stores for LangGraph ([#17](https://github.com/zazabe/langgraph-surrealdb/issues/17)) ([83fd2bd](https://github.com/zazabe/langgraph-surrealdb/commit/83fd2bdb3c6c5b6b03bb579470fa34552232041d))
+
 ## [0.4.0](https://github.com/zazabe/langgraph-surrealdb/compare/langgraph-surrealdb-v0.3.0...langgraph-surrealdb-v0.4.0) (2026-07-31)
 
 
