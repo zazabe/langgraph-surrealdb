@@ -303,7 +303,7 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
             return len(deleted)
 
     async def start_ttl_sweeper(
-        self, sweep_interval_minutes: int | None = None
+        self, sweep_interval_minutes: float | None = None
     ) -> asyncio.Task[None]:
         """Periodically delete expired store items based on TTL.
 

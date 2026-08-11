@@ -2,7 +2,7 @@ import time
 
 from langgraph.store.base import GetOp, PutOp
 
-from langgraph_surrealdb import SurrealStoreIndexSettings
+from langgraph_surrealdb import SurrealStoreIndexSettings, SurrealStoreTTLSettings
 from tests.fixtures.store import CharacterEmbeddings, StoreFactory
 
 
@@ -64,7 +64,8 @@ async def test_namespace_matching_and_truncation(
 
 
 async def test_ttl_expiry_and_refresh(store_factory: StoreFactory) -> None:
-    async with store_factory() as store:
+    ttl_settings = SurrealStoreTTLSettings(enabled=True, refresh_on_read=True)
+    async with store_factory(ttl=ttl_settings) as store:
         ttl = 0.01
         store.put(("ttl",), "item", {"value": 1}, ttl=ttl)
         time.sleep(0.35)
@@ -75,6 +76,30 @@ async def test_ttl_expiry_and_refresh(store_factory: StoreFactory) -> None:
         assert store.get(("ttl",), "item", refresh_ttl=False) is not None
         assert store.sweep_ttl() == 1
         assert store.get(("ttl",), "item", refresh_ttl=False) is None
+
+
+async def test_ttl_sweeper_deletes_expired_items(
+    store_factory: StoreFactory,
+) -> None:
+    ttl_settings = SurrealStoreTTLSettings(enabled=True, refresh_on_read=False)
+    async with store_factory(ttl=ttl_settings) as store:
+        store.put(("ttl-sweeper",), "item", {"value": 1}, ttl=1 / 60)
+        assert store.get(("ttl-sweeper",), "item", refresh_ttl=False) is not None
+
+        sweeper = store.start_ttl_sweeper(sweep_interval_minutes=0.001)
+        try:
+            deadline = time.monotonic() + 2
+            while time.monotonic() < deadline:
+                if store.get(
+                    ("ttl-sweeper",), "item", refresh_ttl=False
+                ) is None:
+                    break
+                time.sleep(0.02)
+
+            assert store.get(("ttl-sweeper",), "item", refresh_ttl=False) is None
+        finally:
+            assert store.stop_ttl_sweeper(timeout=1)
+            sweeper.result(timeout=1)
 
 
 async def test_vector_search(

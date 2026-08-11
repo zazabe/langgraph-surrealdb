@@ -305,7 +305,7 @@ class SurrealStore(BaseStore):
             return len(deleted)
 
     def start_ttl_sweeper(
-        self, sweep_interval_minutes: int | None = None
+        self, sweep_interval_minutes: float | None = None
     ) -> concurrent.futures.Future[None]:
         """Periodically delete expired store items based on TTL.
 

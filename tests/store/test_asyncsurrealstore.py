@@ -4,7 +4,7 @@ import asyncio
 
 from langgraph.store.base import GetOp, PutOp
 
-from langgraph_surrealdb import SurrealStoreIndexSettings
+from langgraph_surrealdb import SurrealStoreIndexSettings, SurrealStoreTTLSettings
 from tests.fixtures.store import AsyncStoreFactory, CharacterEmbeddings
 
 
@@ -70,7 +70,8 @@ async def test_namespace_matching_and_truncation(
 
 
 async def test_ttl_expiry_and_refresh(async_store_factory: AsyncStoreFactory) -> None:
-    async with async_store_factory() as store:
+    ttl_settings = SurrealStoreTTLSettings(enabled=True, refresh_on_read=True)
+    async with async_store_factory(ttl=ttl_settings) as store:
         ttl = 0.01
         await store.aput(("ttl",), "item", {"value": 1}, ttl=ttl)
         await asyncio.sleep(0.35)
@@ -81,6 +82,34 @@ async def test_ttl_expiry_and_refresh(async_store_factory: AsyncStoreFactory) ->
         assert await store.aget(("ttl",), "item", refresh_ttl=False) is not None
         assert await store.sweep_ttl() == 1
         assert await store.aget(("ttl",), "item", refresh_ttl=False) is None
+
+
+async def test_ttl_sweeper_deletes_expired_items(
+    async_store_factory: AsyncStoreFactory,
+) -> None:
+    ttl_settings = SurrealStoreTTLSettings(enabled=True, refresh_on_read=False)
+    async with async_store_factory(ttl=ttl_settings) as store:
+        await store.aput(("ttl-sweeper",), "item", {"value": 1}, ttl=1 / 60)
+        assert (
+            await store.aget(("ttl-sweeper",), "item", refresh_ttl=False)
+            is not None
+        )
+
+        sweeper = await store.start_ttl_sweeper(sweep_interval_minutes=0.001)
+        try:
+            async with asyncio.timeout(2):
+                while (
+                    await store.aget(
+                        ("ttl-sweeper",), "item", refresh_ttl=False
+                    )
+                    is not None
+                ):
+                    await asyncio.sleep(0.02)
+        finally:
+            assert await store.stop_ttl_sweeper(timeout=1)
+
+        assert sweeper.done()
+        assert await store.aget(("ttl-sweeper",), "item", refresh_ttl=False) is None
 
 
 async def test_vector_search(
