@@ -229,6 +229,26 @@ async def test_ttl_expiry_and_refresh(async_store_factory: AsyncStoreFactory) ->
         assert await store.aget(("ttl",), "item", refresh_ttl=False) is None
 
 
+async def test_ttl_sweep_deletes_vectors(
+    async_store_factory: AsyncStoreFactory,
+) -> None:
+    ttl_settings = SurrealStoreTTLSettings(enabled=True, refresh_on_read=False)
+    index = SurrealStoreIndexSettings(
+        enabled=True,
+        dimensions=32,
+        fields=["text"],
+    )
+    async with async_store_factory(
+        ttl=ttl_settings, index=index, embed=CharacterEmbeddings(dims=32)
+    ) as store:
+        await store.aput(("ttl-vector",), "item", {"text": "apple"}, ttl=0.001)
+        assert await store.asearch(("ttl-vector",), query="apple")
+
+        await asyncio.sleep(0.1)
+        assert await store.sweep_ttl() == 1
+        assert await store.asearch(("ttl-vector",), query="apple") == []
+
+
 async def test_get_can_enable_ttl_refresh(
     async_store_factory: AsyncStoreFactory,
 ) -> None:

@@ -309,6 +309,9 @@ class SurrealStore(BaseStore):
         self._ensure_ready()
         with self.lock:
             deleted = self.store_repo.sweep_ttl()
+            if self._is_index_enabled():
+                for item in deleted:
+                    self.vector_repo.delete_by_item(item)
             return len(deleted)
 
     def start_ttl_sweeper(

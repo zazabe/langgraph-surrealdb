@@ -309,6 +309,9 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
         await self._ensure_ready()
         async with self.lock:
             deleted = await self.store_repo.sweep_ttl()
+            if self._is_index_enabled():
+                for item in deleted:
+                    await self.vector_repo.delete_by_item(item)
             return len(deleted)
 
     async def start_ttl_sweeper(
