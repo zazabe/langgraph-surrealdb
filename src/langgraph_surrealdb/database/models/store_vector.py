@@ -88,10 +88,9 @@ class DbStoreItemWithVectors:
 
 
 class DbStoreVectorModelFactory:
-    def __init__(self, table: str = "store"):
-        vector_table = table + "_vector"
-        validate_table_name(vector_table)
-        self._table = vector_table
+    def __init__(self, table: str):
+        validate_table_name(table)
+        self._table = table
 
     @property
     def table(self) -> str:

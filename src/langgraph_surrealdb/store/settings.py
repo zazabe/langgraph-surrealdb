@@ -15,11 +15,12 @@ class SurrealStoreEnvSettings(BaseSettings):
         extra="ignore",
     )
 
-    # store
     index_enabled: bool = Field(default=False)
     index_dimensions: int = Field(default=1536)
     index_fields: list[str] = Field(default_factory=lambda: ["$"])
     index_distance_type: STORE_INDEX_DISTANCE_TYPES = Field(default="cosine")
+
+    ttl_enabled: bool = Field(default=False)
     ttl_refresh_on_read: bool = Field(default=True)
     ttl_default_ttl: float | None = None
     ttl_sweep_interval_minutes: int | None = None
@@ -45,7 +46,7 @@ class SurrealStoreIndexSettings(BaseModel):
 
 
 class SurrealStoreTTLSettings(BaseModel):
-
+    enabled: bool = Field(default=False)
     refresh_on_read: bool = Field(default=True)
     default_ttl: float | None = None
     sweep_interval_minutes: int | None = None
@@ -64,6 +65,10 @@ class SurrealStoreSettings(BaseModel):
     ttl: SurrealStoreTTLSettings = Field(default_factory=SurrealStoreTTLSettings)
     db: SurrealDatabaseSettings
 
+    @property
+    def vector_table(self) -> str:
+        return f"{self.store_table}_vector"
+
     @classmethod
     def from_env(cls) -> Self:
         db = SurrealDatabaseSettings.from_env()
@@ -76,6 +81,7 @@ class SurrealStoreSettings(BaseModel):
             distance_type=cfg.index_distance_type,
         )
         ttl = SurrealStoreTTLSettings(
+            enabled=cfg.ttl_enabled,
             refresh_on_read=(
                 cfg.ttl_refresh_on_read if cfg.ttl_refresh_on_read is not None else True
             ),

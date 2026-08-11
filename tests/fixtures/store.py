@@ -7,7 +7,11 @@ from collections.abc import AsyncGenerator, AsyncIterator
 import pytest
 from langgraph.store.base import Embeddings
 
-from langgraph_surrealdb import AsyncSurrealStore, SurrealStoreIndexSettings
+from langgraph_surrealdb import (
+    AsyncSurrealStore,
+    SurrealStore,
+    SurrealStoreIndexSettings,
+)
 from langgraph_surrealdb.settings import SurrealDatabaseSettings
 from langgraph_surrealdb.store.settings import SurrealStoreSettings
 from tests.fixtures.database import clear_tables, drop_database, init_database
@@ -58,7 +62,7 @@ async def store_settings(
 
 
 @pytest.fixture(scope="function")
-async def store(
+async def async_store(
     root_store_settings: SurrealStoreSettings,
     store_settings: SurrealStoreSettings,
 ) -> AsyncIterator[AsyncSurrealStore]:
@@ -73,7 +77,7 @@ async def store(
 
 
 @pytest.fixture(scope="function")
-async def store_vector(
+async def async_store_vector(
     root_store_settings: SurrealStoreSettings,
     store_settings: SurrealStoreSettings,
 ) -> AsyncIterator[AsyncSurrealStore]:
@@ -95,5 +99,45 @@ async def store_vector(
     tables = [store_settings.store_table, f"{store_settings.store_table}_index"]
     await clear_tables(root_store_settings.db, tables)
     async with AsyncSurrealStore.from_settings(store_settings, embed=emded) as instance:
+        yield instance
+    await clear_tables(root_store_settings.db, tables)
+
+
+@pytest.fixture(scope="function")
+async def store(
+    root_store_settings: SurrealStoreSettings,
+    store_settings: SurrealStoreSettings,
+) -> AsyncIterator[SurrealStore]:
+    with SurrealStore.from_settings(root_store_settings) as store:
+        store.setup()
+
+    tables = [store_settings.store_table, store_settings.vector_table]
+    await clear_tables(root_store_settings.db, tables)
+    with SurrealStore.from_settings(store_settings) as instance:
+        yield instance
+    await clear_tables(root_store_settings.db, tables)
+
+
+@pytest.fixture(scope="function")
+async def store_vector(
+    root_store_settings: SurrealStoreSettings,
+    store_settings: SurrealStoreSettings,
+) -> AsyncIterator[SurrealStore]:
+    index_settings = SurrealStoreIndexSettings(
+        enabled=True,
+        dimensions=32,
+        fields=["text"],
+        distance_type="cosine",
+    )
+    store_settings.index = index_settings
+    root_store_settings.index = index_settings
+    emded = CharacterEmbeddings()
+
+    with SurrealStore.from_settings(root_store_settings, embed=emded) as store:
+        store.setup()
+
+    tables = [store_settings.store_table, store_settings.vector_table]
+    await clear_tables(root_store_settings.db, tables)
+    with SurrealStore.from_settings(store_settings, embed=emded) as instance:
         yield instance
     await clear_tables(root_store_settings.db, tables)

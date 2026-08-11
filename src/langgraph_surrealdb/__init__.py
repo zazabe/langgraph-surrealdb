@@ -9,6 +9,7 @@ from langgraph_surrealdb.settings import (
     TokenAuth,
 )
 from langgraph_surrealdb.store.aio import AsyncSurrealStore
+from langgraph_surrealdb.store.base import SurrealStore
 from langgraph_surrealdb.store.settings import (
     SurrealStoreIndexSettings,
     SurrealStoreSettings,
@@ -24,6 +25,7 @@ __all__ = [
     "SurrealStoreSettings",
     "SurrealStoreIndexSettings",
     "SurrealStoreTTLSettings",
+    "SurrealStore",
     "RootAuth",
     "TokenAuth",
     "RecordAuth",

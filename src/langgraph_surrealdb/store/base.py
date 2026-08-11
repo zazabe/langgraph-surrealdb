@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-import asyncio
+import concurrent.futures
 import logging
-from collections.abc import AsyncIterator, Iterable, Sequence
-from contextlib import asynccontextmanager
+import threading
+from collections import defaultdict
+from collections.abc import Iterable, Iterator, Sequence
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
-from types import TracebackType
 from typing import cast
 
 from langgraph.store.base import (
+    BaseStore,
     Embeddings,
     GetOp,
     ListNamespacesOp,
@@ -18,10 +20,9 @@ from langgraph.store.base import (
     SearchOp,
     ensure_embeddings,
 )
-from langgraph.store.base.batch import AsyncBatchedBaseStore
-from langgraph.store.base.embed import AEmbeddingsFunc, EmbeddingsFunc
+from langgraph.store.base.embed import EmbeddingsFunc
 
-from langgraph_surrealdb.database import SurrealAsyncConnection, async_surreal_client
+from langgraph_surrealdb.database import SurrealConnection, surreal_client
 from langgraph_surrealdb.database.models.store import (
     DbStoreItem,
     DbStoreModelFactory,
@@ -33,76 +34,74 @@ from langgraph_surrealdb.database.models.store_vector import (
     DbStoreVectorModelFactory,
 )
 from langgraph_surrealdb.database.repository.store import (
-    DbAsyncStoreRepository,
+    DbStoreRepository,
     SearchQuery,
     SearchQueryIndex,
 )
 from langgraph_surrealdb.database.repository.store_vector import (
-    DbAsyncStoreVectorRepository,
+    DbStoreVectorRepository,
 )
-from langgraph_surrealdb.store.base import group_ops, matches_namespace
 from langgraph_surrealdb.store.settings import SurrealStoreSettings
 
 logger = logging.getLogger(__name__)
 
 
-class AsyncSurrealStore(AsyncBatchedBaseStore):
-    """Asynchronous LangGraph store backed by SurrealDB."""
+class SurrealStore(BaseStore):
+    """LangGraph store backed by SurrealDB."""
 
     supports_ttl = True
 
     def __init__(
         self,
-        conn: SurrealAsyncConnection,
+        conn: SurrealConnection,
         *,
         settings: SurrealStoreSettings,
-        embed: Embeddings | EmbeddingsFunc | AEmbeddingsFunc | str | None,
+        embed: Embeddings | EmbeddingsFunc | str | None,
     ) -> None:
         super().__init__()
         self.store_factory = DbStoreModelFactory(table=settings.store_table)
         self.vector_factory = DbStoreVectorModelFactory(table=settings.vector_table)
-        self.store_repo = DbAsyncStoreRepository(conn, self.store_factory, settings.ttl)
-        self.vector_repo = DbAsyncStoreVectorRepository(
+        self.store_repo = DbStoreRepository(conn, self.store_factory, settings.ttl)
+        self.vector_repo = DbStoreVectorRepository(
             conn, self.vector_factory, settings.index
         )
-
-        self.lock = asyncio.Lock()
         self.is_setup = False
         self.settings = settings
         self.embeddings = None
-        if embed is not None and settings.index.enabled is True:
+        if embed is not None and settings.index.enabled:
             self.embeddings = ensure_embeddings(embed)
 
         self.ttl_config = None
         if settings.ttl.enabled:
             self.ttl_config = settings.ttl.into_ttl_config()
 
-        self._ttl_stop_event = asyncio.Event()
-        self._ttl_sweeper_task: asyncio.Task[None] | None = None
+        self.lock = threading.Lock()
+        self._ttl_sweeper_thread: threading.Thread | None = None
+        self._ttl_stop_event = threading.Event()
 
     @classmethod
-    @asynccontextmanager
-    async def from_env(
+    @contextmanager
+    def from_env(
         cls,
         *,
-        embed: Embeddings | EmbeddingsFunc | AEmbeddingsFunc | str | None = None,
-    ) -> AsyncIterator[AsyncSurrealStore]:
+        embed: Embeddings | EmbeddingsFunc | str | None = None,
+    ) -> Iterator[SurrealStore]:
         settings = SurrealStoreSettings.from_env()
-        async with cls.from_settings(
+        with cls.from_settings(
             settings,
             embed=embed,
         ) as store:
             yield store
 
     @classmethod
-    @asynccontextmanager
-    async def from_settings(
+    @contextmanager
+    def from_settings(
         cls,
         settings: SurrealStoreSettings,
         *,
-        embed: Embeddings | EmbeddingsFunc | AEmbeddingsFunc | str | None = None,
-    ) -> AsyncIterator[AsyncSurrealStore]:
-        async with async_surreal_client(settings.db) as conn:
+        embed: Embeddings | EmbeddingsFunc | str | None = None,
+    ) -> Iterator[SurrealStore]:
+        with surreal_client(settings.db) as conn:
             store = cls(
                 conn,
                 settings=settings,
@@ -110,27 +109,27 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
             )
             yield store
 
-    async def setup(self) -> None:
-        async with self.lock:
+    def setup(self) -> None:
+        with self.lock:
             if self.is_setup:
                 return
-            await self.store_repo.setup()
-            await self.vector_repo.setup(store_table=self.store_factory.table)
+            self.store_repo.setup()
+            self.vector_repo.setup(store_table=self.store_factory.table)
             self.is_setup = True
 
-    async def probe(self) -> None:
-        async with self.lock:
+    def probe(self) -> None:
+        with self.lock:
             if self.is_setup:
                 return
-            await self.store_repo.probe()
-            await self.vector_repo.probe()
+            self.store_repo.probe()
+            self.vector_repo.probe()
             self.is_setup = True
 
-    async def _ensure_ready(self) -> None:
+    def _ensure_ready(self) -> None:
         if self.is_setup:
             return
         try:
-            await self.probe()
+            self.probe()
         except Exception as exc:
             raise RuntimeError(
                 "SurrealDB store schema is not initialized. "
@@ -138,20 +137,23 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
             ) from exc
 
     async def abatch(self, ops: Iterable[Op]) -> list[Result]:
-        await self._ensure_ready()
+        raise NotImplementedError("Use AsyncSurrealStore")
+
+    def batch(self, ops: Iterable[Op]) -> list[Result]:
+        self._ensure_ready()
         grouped, count = group_ops(ops)
         results: list[Result] = [None] * count
-        async with self.lock:
+        with self.lock:
             if GetOp in grouped:
-                await self._batch_get(
+                self._batch_get(
                     cast(Sequence[tuple[int, GetOp]], grouped[GetOp]), results
                 )
             if SearchOp in grouped:
-                await self._batch_search(
+                self._batch_search(
                     cast(Sequence[tuple[int, SearchOp]], grouped[SearchOp]), results
                 )
             if ListNamespacesOp in grouped:
-                await self._batch_list_namespaces(
+                self._batch_list_namespaces(
                     cast(
                         Sequence[tuple[int, ListNamespacesOp]],
                         grouped[ListNamespacesOp],
@@ -159,17 +161,17 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
                     results,
                 )
             if PutOp in grouped:
-                await self._batch_put(cast(Sequence[tuple[int, PutOp]], grouped[PutOp]))
+                self._batch_put(cast(Sequence[tuple[int, PutOp]], grouped[PutOp]))
         return results
 
-    async def _batch_get(
+    def _batch_get(
         self,
         ops: Sequence[tuple[int, GetOp]],
         results: list[Result],
     ) -> None:
         for result_index, op in ops:
             item_id = self.store_factory.create_id(namespace=op.namespace, key=op.key)
-            item = await self.store_repo.get_by_id(item_id)
+            item = self.store_repo.get_by_id(item_id)
             if item is None:
                 continue
             if (
@@ -179,10 +181,10 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
                 and item.ttl_minutes is not None
             ):
                 expires_at = datetime.now(UTC) + timedelta(minutes=item.ttl_minutes)
-                await self.store_repo.refresh_expiry(item.id, expires_at)
+                self.store_repo.refresh_expiry(item.id, expires_at)
             results[result_index] = item.to_item()
 
-    async def _batch_put(
+    def _batch_put(
         self,
         ops: Sequence[tuple[int, PutOp]],
     ) -> None:
@@ -193,10 +195,10 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
         prepared: list[DbStoreItemWithVectorRequests] = []
         for op in deduplicated.values():
             item_id = self.store_factory.create_id(namespace=op.namespace, key=op.key)
-            item = await self.store_repo.get_by_id(item_id)
+            item = self.store_repo.get_by_id(item_id)
             if op.value is None:
                 if item is not None:
-                    await self.store_repo.delete(item_id)
+                    self.store_repo.delete(item_id)
                 continue
 
             if item is None:
@@ -221,14 +223,14 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
             item_with_requests = DbStoreItemWithVectorRequests(item, fields)
             prepared.append(item_with_requests)
 
-        items_with_vectors = await self._generate_vectors(prepared)
+        items_with_vectors = self._generate_vectors(prepared)
 
         for item_with_vectors in items_with_vectors:
-            await self.store_repo.upsert(item_with_vectors.item)
+            self.store_repo.upsert(item_with_vectors.item)
             for vector in item_with_vectors.vectors:
-                await self.vector_repo.upsert(vector)
+                self.vector_repo.upsert(vector)
 
-    async def _batch_search(
+    def _batch_search(
         self,
         ops: Sequence[tuple[int, SearchOp]],
         results: list[Result],
@@ -241,7 +243,7 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
             op.query for _, op in ops if self._is_index_enabled() and op.query
         )
         if self.embeddings and self._is_index_enabled():
-            query_vectors = await self.embeddings.aembed_documents(list(query_texts))
+            query_vectors = self.embeddings.embed_documents(list(query_texts))
 
         for query_text, query_vector in zip(query_texts, query_vectors, strict=True):
             queries[hash(query_text)] = SearchQueryIndex(
@@ -252,7 +254,7 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
             query = queries.get(hash(op.query))
             if op.query and query is None:
                 raise ValueError("Query not found in cache: " + op.query)
-            result = await self.store_repo.search(
+            result = self.store_repo.search(
                 SearchQuery(
                     namespace=list(op.namespace_prefix),
                     query=query,
@@ -264,20 +266,20 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
 
             results[result_index] = [item.to_item() for item in result]
 
-    async def _refresh_items(self, items: Sequence[DbStoreItem]) -> None:
+    def _refresh_items(self, items: Sequence[DbStoreItem]) -> None:
         now = datetime.now(UTC)
         for item in items:
             if item.ttl_minutes is not None:
-                await self.store_repo.refresh_expiry(
+                self.store_repo.refresh_expiry(
                     item.id, now + timedelta(minutes=item.ttl_minutes)
                 )
 
-    async def _batch_list_namespaces(
+    def _batch_list_namespaces(
         self,
         ops: Sequence[tuple[int, ListNamespacesOp]],
         results: list[Result],
     ) -> None:
-        raw_namespaces = await self.store_repo.list_namespaces()
+        raw_namespaces = self.store_repo.list_namespaces()
         for result_index, op in ops:
             namespaces = {tuple(namespace) for namespace in raw_namespaces}
             if op.match_conditions:
@@ -296,25 +298,33 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
             ordered = sorted(namespaces)
             results[result_index] = ordered[op.offset : op.offset + op.limit]
 
-    async def sweep_ttl(self) -> int:
-        await self._ensure_ready()
-        async with self.lock:
-            deleted = await self.store_repo.sweep_ttl()
+    def sweep_ttl(self) -> int:
+        self._ensure_ready()
+        with self.lock:
+            deleted = self.store_repo.sweep_ttl()
             return len(deleted)
 
-    async def start_ttl_sweeper(
+    def start_ttl_sweeper(
         self, sweep_interval_minutes: int | None = None
-    ) -> asyncio.Task[None]:
+    ) -> concurrent.futures.Future[None]:
         """Periodically delete expired store items based on TTL.
 
         Returns:
-            Task that can be awaited or cancelled.
+            Future that can be waited on or cancelled.
         """
         if not self.ttl_config:
-            return asyncio.create_task(asyncio.sleep(0))
+            future: concurrent.futures.Future[None] = concurrent.futures.Future()
+            future.set_result(None)
+            return future
 
-        if self._ttl_sweeper_task is not None and not self._ttl_sweeper_task.done():
-            return self._ttl_sweeper_task
+        if self._ttl_sweeper_thread and self._ttl_sweeper_thread.is_alive():
+            logger.info("TTL sweeper thread is already running")
+            # Return a future that can be used to cancel the existing thread
+            future = concurrent.futures.Future()
+            future.add_done_callback(
+                lambda f: self._ttl_stop_event.set() if f.cancelled() else None
+            )
+            return future
 
         self._ttl_stop_event.clear()
 
@@ -323,83 +333,69 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
         )
         logger.info(f"Starting store TTL sweeper with interval {interval} minutes")
 
-        async def _sweep_loop() -> None:
-            while not self._ttl_stop_event.is_set():
-                try:
-                    try:
-                        await asyncio.wait_for(
-                            self._ttl_stop_event.wait(),
-                            timeout=interval * 60,
-                        )
+        future = concurrent.futures.Future()
+
+        def _sweep_loop() -> None:
+            try:
+                while not self._ttl_stop_event.is_set():
+                    if self._ttl_stop_event.wait(interval * 60):
                         break
-                    except TimeoutError:
-                        pass
 
-                    expired_items = await self.sweep_ttl()
-                    if expired_items > 0:
-                        logger.info(f"Store swept {expired_items} expired items")
-                except asyncio.CancelledError:
-                    break
-                except Exception as exc:
-                    logger.exception("Store TTL sweep iteration failed", exc_info=exc)
+                    try:
+                        expired_items = self.sweep_ttl()
+                        if expired_items > 0:
+                            logger.info(f"Store swept {expired_items} expired items")
+                    except Exception as exc:
+                        logger.exception(
+                            "Store TTL sweep iteration failed", exc_info=exc
+                        )
+                future.set_result(None)
+            except Exception as exc:
+                future.set_exception(exc)
 
-        task = asyncio.create_task(_sweep_loop())
-        task.set_name("ttl_sweeper")
-        self._ttl_sweeper_task = task
-        return task
+        thread = threading.Thread(target=_sweep_loop, daemon=True, name="ttl-sweeper")
+        self._ttl_sweeper_thread = thread
+        thread.start()
 
-    async def stop_ttl_sweeper(self, timeout: float | None = None) -> bool:
-        """Stop the TTL sweeper task if it's running.
+        future.add_done_callback(
+            lambda f: self._ttl_stop_event.set() if f.cancelled() else None
+        )
+        return future
+
+    def stop_ttl_sweeper(self, timeout: float | None = None) -> bool:
+        """Stop the TTL sweeper thread if it's running.
 
         Args:
-            timeout: Maximum time to wait for the task to stop, in seconds.
+            timeout: Maximum time to wait for the thread to stop, in seconds.
                 If `None`, wait indefinitely.
 
         Returns:
-            bool: True if the task was successfully stopped or wasn't running,
-                False if the timeout was reached before the task stopped.
+            bool: True if the thread was successfully stopped or wasn't running,
+                False if the timeout was reached before the thread stopped.
         """
-        if self._ttl_sweeper_task is None or self._ttl_sweeper_task.done():
+        if not self._ttl_sweeper_thread or not self._ttl_sweeper_thread.is_alive():
             return True
 
-        logger.info("Stopping TTL sweeper task")
+        logger.info("Stopping TTL sweeper thread")
         self._ttl_stop_event.set()
 
-        if timeout is not None:
-            try:
-                await asyncio.wait_for(self._ttl_sweeper_task, timeout=timeout)
-                success = True
-            except TimeoutError:
-                success = False
-        else:
-            await self._ttl_sweeper_task
-            success = True
+        self._ttl_sweeper_thread.join(timeout)
+        success = not self._ttl_sweeper_thread.is_alive()
 
         if success:
-            self._ttl_sweeper_task = None
-            logger.info("TTL sweeper task stopped")
+            self._ttl_sweeper_thread = None
+            logger.info("TTL sweeper thread stopped")
         else:
-            logger.warning("Timed out waiting for TTL sweeper task to stop")
+            logger.warning("Timed out waiting for TTL sweeper thread to stop")
 
         return success
 
-    async def __aenter__(self) -> AsyncSurrealStore:
-        return self
+    def __del__(self) -> None:
+        """Ensure the TTL sweeper thread is stopped when the object is garbage collected."""
+        if hasattr(self, "_ttl_stop_event") and hasattr(self, "_ttl_sweeper_thread"):
+            self.stop_ttl_sweeper(timeout=0.1)
 
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        # Ensure the TTL sweeper task is stopped when exiting the context
-        if hasattr(self, "_ttl_sweeper_task") and self._ttl_sweeper_task is not None:
-            # Set the event to signal the task to stop
-            self._ttl_stop_event.set()
-            # We don't wait for the task to complete here to avoid blocking
-            # The task will clean up itself gracefully
-
-    async def _generate_vectors(
+    def _generate_vectors(
         self, items: list[DbStoreItemWithVectorRequests]
     ) -> list[DbStoreItemWithVectors]:
         if not items or not self.embeddings:
@@ -408,7 +404,7 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
             ]
 
         texts = [request.text for item in items for request in item.vector_requests]
-        embeddings = await self.embeddings.aembed_documents(texts)
+        embeddings = self.embeddings.embed_documents(texts)
         if len(embeddings) != len(texts):
             raise ValueError(
                 f"Embedding count mismatch: expected {len(texts)}, got {len(embeddings)}"
@@ -439,3 +435,29 @@ class AsyncSurrealStore(AsyncBatchedBaseStore):
 
     def _is_index_enabled(self) -> bool:
         return self.settings.index.enabled
+
+
+def matches_namespace(
+    namespace: tuple[str, ...], pattern: tuple[str, ...], match_type: str
+) -> bool:
+    if len(pattern) > len(namespace):
+        return False
+    if match_type == "prefix":
+        candidate = namespace[: len(pattern)]
+    elif match_type == "suffix":
+        candidate = namespace[len(namespace) - len(pattern) :] if pattern else ()
+    else:
+        raise ValueError(f"Unsupported namespace match type: {match_type}")
+    return all(
+        expected == "*" or expected == actual
+        for expected, actual in zip(pattern, candidate, strict=True)
+    )
+
+
+def group_ops(ops: Iterable[Op]) -> tuple[dict[type, list[tuple[int, Op]]], int]:
+    grouped: dict[type, list[tuple[int, Op]]] = defaultdict(list)
+    count = 0
+    for index, op in enumerate(ops):
+        grouped[type(op)].append((index, op))
+        count += 1
+    return grouped, count
